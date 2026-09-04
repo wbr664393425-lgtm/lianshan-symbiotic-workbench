@@ -1,0 +1,4897 @@
+:root {
+  font-family: "SF Pro Display", "PingFang SC", -apple-system, BlinkMacSystemFont, "Noto Sans SC", sans-serif;
+  color: #111318;
+  background: #dfe3e2;
+  font-synthesis: none;
+  --ink: #101418;
+  --ink-muted: #596368;
+  /* 通透优先：这两档保持视觉稿原本的轻。原先散落着 20 个几乎一样的浅灰在做同样两件事，
+     现在合并成两级——次级标签（≥11px 或未声明字号）用 soft，最小一号的元信息
+     （8-10px 的时间、大小、来源位置）用 faint。层级只由这两级 + 字号字重决定，
+     不要再往里加第三个手写灰。
+     已知代价：faint 一档实测约 2.6:1，低于 WCAG AA 的 4.5:1。这是明确选择了
+     视觉稿的通透感，不是遗漏——正式产品页面若要过无障碍验收，需要另立一套字色。 */
+  --ink-soft: #7e888c;
+  --ink-faint: #99a2a5;
+  /* 青柠是能力色，承载文字时统一走这一档；比图标用的亮青柠稍收一点，
+     但仍保持视觉稿里那种新鲜的绿。图标和状态点继续用亮青柠。 */
+  --leaf-text: #58a021;
+  /* 描边和阴影共用 --shade 一个色相。原先 17 条中性发丝线在
+     rgba(27..48, 35..62, 39..65, .065..#.1) 之间各写各的，没人能说出差别，
+     但并排出现时边缘的冷暖是飘的。玻璃的白边同理收成两档。 */
+  --line: rgba(var(--shade), .085);
+  --line-strong: rgba(var(--shade), .11);
+  --glass-line: rgba(255, 255, 255, .88);
+  --glass-line-soft: rgba(255, 255, 255, .7);
+  /* 圆角收成 4px 一档的 5 级。原先 18 种像素值（6/7/8/9/10/11/12/13/14/15/16/17/18/20/22/24）
+     在做 5 件事，相邻组件差 1px 的圆角只会读成"没对齐"。就近归档，单处最大位移 2px；
+     胶囊仍用 999px，形状本身是设计语言的（血滴形、3px 细条）保持原值。 */
+  --r-xs: 8px;
+  --r-sm: 12px;
+  --r-md: 16px;
+  --r-lg: 20px;
+  --r-xl: 24px;
+  --lime: #82dd2d;
+  --lime-soft: rgba(130, 221, 45, .12);
+  --blue: #236de9;
+  --red: #ff5a50;
+  --ease-premium: cubic-bezier(.16, 1, .3, 1);
+
+  /* 材质：所有静置表面共用一个阴影色相（取自背景的冷墨绿），并且都是"接触阴影 +
+     环境阴影"两层。单层大模糊看起来是贴纸浮在页面上，补一层贴边的短阴影才有实体
+     压住纸面的重量。原先 100 多条 box-shadow 各写各的色相和衰减，同屏并列时眼睛
+     读到的是杂音而不是层级。 */
+  --shade: 46, 58, 62;
+  --e1: 0 1px 2px rgba(var(--shade), .05), 0 5px 14px rgba(var(--shade), .04);
+  --e2: 0 1px 3px rgba(var(--shade), .06), 0 12px 30px rgba(var(--shade), .055);
+  --e3: 0 2px 6px rgba(var(--shade), .07), 0 22px 50px rgba(var(--shade), .08);
+  --e-dark: 0 1px 3px rgba(14, 18, 20, .16), 0 10px 24px rgba(14, 18, 20, .16);
+  /* 强调色按钮用自己的色相投影，蓝底压出一块中性灰影会显脏 */
+  --e-accent: 0 1px 2px rgba(20, 66, 148, .28), 0 8px 18px rgba(35, 109, 233, .24);
+  --e-accent-hover: 0 1px 2px rgba(20, 66, 148, .32), 0 12px 24px rgba(35, 109, 233, .3);
+  --edge: inset 0 1px 0 rgba(255, 255, 255, .92);
+  --edge-strong: inset 0 1px 0 rgba(255, 255, 255, .98);
+  /* 焦点环统一走品牌蓝（就是 --blue 本身）。原先四个组件用了四种焦点色：
+     青柠内描边、两种偏紫的蓝、一种青色，键盘走一圈像换了四个产品。 */
+  --focus: rgba(35, 109, 233, .8);
+}
+
+/* 注册成可插值的数值，浏览器才会对它做原生补间——输入条的收起因此是一条
+   连续曲线，而不是到达阈值后整块跳变。 */
+/* 轮廓勾勒的椭圆半径注册成百分比，浏览器才会把它当数值插值——
+   直接补间 radial-gradient 是不行的，渐变本身无法插值（见 .companion-wrap::after 那条教训）。
+   点火本身已经不用径向遮罩了：它改由 .ignite-gate 的 filter 阈值推进，见下面的开场段。 */
+@property --brand-wipe {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 100%;
+}
+
+@property --edge-r {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 0%;
+}
+
+@property --dock-collapse {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+/* 注册的唯一目的是 inherits: false。它只被 .composer-dock 自己读，
+   但未注册的自定义属性一律按继承处理——任务页每滚一下都要重写它一次，
+   而每次重写都会把输入条底下（文本域、工具条、模式滑块、主按钮、附件条…）
+   整棵子树的样式打脏。声明成不继承之后，脏的就只有输入条本身。 */
+/* 打字蓄能的强度。注册成数值浏览器才会连续插值——不然每敲一键都是一次跳变。 */
+@property --charge {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+@property --dock-pointer {
+  syntax: "*";
+  inherits: false;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100dvh;
+  -webkit-font-smoothing: antialiased;
+  background: #dfe3e2;
+}
+
+button,
+textarea {
+  font: inherit;
+}
+
+button {
+  border: 0;
+}
+
+.prototype-stage {
+  /* relative 是给 overflow: hidden 兜底的：stage 若是 static，绝对定位的开场层
+     会以初始包含块为准，直接从这个裁剪框里逃出去把文档撑大（intro-glow 踩过一次）。 */
+  position: relative;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 8px;
+  overflow: hidden;
+  background: #dfe3e2;
+}
+
+/* 细颗粒层：大面积柔和渐变在真实屏幕上会走出色带，一层 3.6% 的静态噪点把台阶
+   打散，顺带给整套玻璃一点胶片质感。固定定位、不接指针事件、不参与任何动画，
+   只合成一次。噪点本身带 alpha（feColorMatrix 把湍流的红通道映射成透明度），
+   因此不需要 mix-blend-mode——混合模式会把整页拉进一个混合组重新合成，
+   首屏本来就有好几层 backdrop-filter 在排队，不该再加这一笔。 */
+.prototype-stage::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+  opacity: .032;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 180px 180px;
+}
+
+/* 高对比度偏好下噪点只会削弱文字边缘，直接撤掉。 */
+@media (prefers-contrast: more) {
+  .prototype-stage::after {
+    display: none;
+  }
+}
+
+.app-frame {
+  position: relative;
+  width: min(1488px, calc(100vw - 16px));
+  height: min(1058px, calc(100dvh - 16px));
+  min-height: 720px;
+  display: grid;
+  grid-template-columns: 126px minmax(0, 1fr);
+  overflow: hidden;
+  border: 10px solid #17191d;
+  border-radius: 38px;
+  background: #f9faf9;
+  box-shadow: 0 24px 70px rgba(17, 23, 27, .24), 0 3px 12px rgba(17, 23, 27, .16);
+}
+
+/* 入场目标在 GSAP 接管之前必须先隐藏。DOM 解析完到 GSAP 初始化之间有一段真空，
+   这些元素会以完全可见的状态出现，随后被 .from() 瞬间打回 0 再淡入——读起来
+   就是"先闪一下、卡一下才出现"。GSAP 一就位就加 .is-entrance-ready 放行，
+   由内联值接管；若动效被禁用（reduced motion），这个 class 同样会加上。 */
+.app-frame:not(.is-entrance-ready) .side-brand,
+.app-frame:not(.is-entrance-ready) .workspace-brand,
+.app-frame:not(.is-entrance-ready) .capability-area,
+.app-frame:not(.is-entrance-ready) .capability-card,
+.app-frame:not(.is-entrance-ready) .side-rail nav button,
+.app-frame:not(.is-entrance-ready) .nav-glass,
+.app-frame:not(.is-entrance-ready) .hero-copy > *,
+.app-frame:not(.is-entrance-ready) .companion-node,
+.app-frame:not(.is-entrance-ready) .composer-input,
+.app-frame:not(.is-entrance-ready) .composer-toolbar {
+  opacity: 0;
+}
+
+.side-rail {
+  position: relative;
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  padding: 40px 14px 32px;
+  border-right: 1px solid var(--line-strong);
+  background: rgba(250, 251, 250, .92);
+  backdrop-filter: blur(22px);
+}
+
+.side-brand {
+  height: 92px;
+  display: grid;
+  justify-items: center;
+  align-content: start;
+}
+
+.brand-mark-shell {
+  width: 58px;
+  height: 58px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-md);
+  background: #131619;
+  box-shadow: var(--e-dark);
+}
+
+.brand-mark-shell img {
+  width: 46px;
+  height: 46px;
+  object-fit: contain;
+  filter: drop-shadow(0 3px 8px rgba(131, 224, 46, .14));
+}
+
+.side-rail nav {
+  position: relative;
+  flex: 1;
+  display: grid;
+  grid-template-rows: repeat(3, 104px) 1fr 104px;
+  align-items: start;
+  padding-top: 10px;
+}
+
+.nav-glass {
+  position: absolute;
+  z-index: 0;
+  left: 0;
+  top: 10px;
+  width: 96px;
+  height: 88px;
+  overflow: hidden;
+  border: 1px solid var(--glass-line);
+  border-radius: var(--r-lg);
+  background: linear-gradient(145deg, rgba(255,255,255,.93), rgba(246,251,249,.62));
+  box-shadow: var(--e2), var(--edge-strong), inset 0 -1px 0 rgba(105,122,128,.08);
+  backdrop-filter: blur(22px) saturate(1.18);
+  transform-origin: 50% 50%;
+  pointer-events: none;
+  will-change: transform;
+  /* 高亮块的 opacity 归 CSS，transform 归 GSAP（位移/形变由 move 独占，且它带 overwrite: true，
+     opacity 交给 GSAP 会在入场期间被一次导航点击整条清掉）。用 keyframes 而不是 transition：
+     is-entrance-ready 是在 layout effect 里同步加的，首帧之前的 class 切换不保证触发过渡；
+     动画则从元素挂载起算，backwards 负责延迟期间保持隐藏。 */
+  opacity: 1;
+  animation: nav-glass-reveal .72s cubic-bezier(.16, 1, .3, 1) .42s backwards;
+}
+
+/* 导航项排完之后高亮块才显影，否则首帧就是一块空玻璃悬在还没出现的按钮上。 */
+@keyframes nav-glass-reveal {
+  from { opacity: 0; }
+}
+
+.nav-glass::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 22% 12%, rgba(255,255,255,.94), transparent 35%), linear-gradient(120deg, transparent 20%, rgba(137,205,255,.1), transparent 68%);
+}
+
+.nav-glass::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 28px;
+  width: 3px;
+  height: 32px;
+  border-radius: var(--r-xs);
+  background: #85e529;
+  box-shadow: 0 0 12px rgba(133, 229, 41, .6);
+}
+
+.nav-glass i {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  top: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.98), transparent);
+}
+
+.side-rail nav button {
+  position: relative;
+  z-index: 1;
+  width: 96px;
+  height: 88px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 8px;
+  border-radius: var(--r-lg);
+  color: #626b70;
+  background: transparent;
+  cursor: pointer;
+  /* opacity 归入场时间轴所有：CSS 再挂一条过渡会把 GSAP 每帧写的值又渐变一遍。 */
+  transition: color .25s ease, background .25s ease;
+}
+
+.side-rail nav button:nth-of-type(4) {
+  grid-row: 5;
+}
+
+.side-rail nav button:hover:not(.is-active) {
+  color: #14181b;
+  transform: translateY(-2px);
+}
+
+.side-rail nav button.is-active {
+  color: #0c1013;
+  background: transparent;
+  box-shadow: none;
+}
+
+.side-rail nav button.is-active::before {
+  content: none;
+}
+
+.side-rail nav button.is-pending { cursor: default; }
+.side-rail nav button:focus { outline: none; }
+.side-rail nav button:focus-visible { outline: 2px solid var(--focus); outline-offset: -6px; }
+
+.side-rail nav svg {
+  width: 30px;
+  height: 30px;
+}
+
+.side-rail nav span {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.workspace {
+  /* 指针光斑的 --pointer-x/y 不在这里定义：它们每次 pointermove 都要重写，
+     而自定义属性是继承的——写在 .workspace 上会让它下面 800 多个后代整棵
+     重算样式（实测每次重算 384 个元素、6.2ms，移动 3 秒就吃掉 1.2s 主线程）。
+     现在它们写在 .workspace-glow 这一个叶子节点自己身上，失效范围就是它一个。
+     --companion-shift-x/y 已经删除：没有任何 CSS 消费它们，却在跟着一起写。 */
+  /* 输入条的落位与占高只在这里定义一次，首页内容据此预留空间。
+     两者若各自从相反的边硬编码，容器一变矮就会撞上。 */
+  --composer-bottom: 85px;
+  --composer-min-h: 180px;
+  --composer-reserve: calc(var(--composer-bottom) + var(--composer-min-h));
+  position: relative;
+  min-width: 0;
+  /* clip 而不是 hidden：伴生体向右溢出约 178px，hidden 仍然是一个可滚动容器，
+     浏览器把某个控件 scrollIntoView（键盘聚焦、触控板横向惯性）时会把整个工作区
+     推走 178px 且不会自己回来——整页看起来就是突然左移。clip 不建立滚动容器，
+     裁切效果完全一样。 */
+  overflow: clip;
+  background: #fbfcfb;
+}
+
+.home-view,
+.task-view {
+  position: absolute;
+  inset: 0;
+}
+
+.home-view {
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: clamp(24px, 7vh, 76px);
+  padding: clamp(72px, 15vh, 163px) 56px calc(var(--composer-reserve) + 30px);
+}
+
+.task-view {
+  z-index: 4;
+  color: #eef5f6;
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  /* 不写常驻 will-change：它会让整块工作面板（实测 2760x1728 设备像素、18MB 纹理）
+     在任务页停留期间一直占着一个合成层。路由转场由 GSAP 驱动，补间期间浏览器
+     自己会提升，补间结束就释放——这正是 will-change 该有的生命周期。 */
+}
+
+/* 指针光斑是一个真实的叶子节点，不是 .workspace::before。伪元素只能从宿主继承
+   自定义属性，也就是说 --pointer-x/y 必须写在 .workspace 上，而那会让整个工作区
+   的样式在每次指针移动时全部失效。改成独立元素之后，重写属性只脏它自己。 */
+.workspace-glow {
+  --pointer-x: 68%;
+  --pointer-y: 38%;
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: block;
+  pointer-events: none;
+  opacity: .32;
+  background: radial-gradient(circle 360px at var(--pointer-x) var(--pointer-y), rgba(132, 227, 44, .105), transparent 70%);
+  transition: opacity .35s var(--ease-premium);
+}
+
+.workspace:hover > .workspace-glow,
+.workspace.is-running > .workspace-glow {
+  opacity: .72;
+}
+
+.workspace::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  box-shadow: inset 0 0 110px rgba(115, 129, 132, .06);
+}
+
+.motion-light-field {
+  position: absolute;
+  z-index: 12;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  overflow: hidden;
+  mix-blend-mode: screen;
+}
+
+.motion-light-anchor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  will-change: transform;
+}
+
+.motion-light-flare {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 62px;
+  height: 38px;
+  border-radius: 50%;
+  opacity: .72;
+  background: radial-gradient(ellipse, rgba(255,255,255,.72), rgba(143,193,255,.16) 28%, transparent 70%);
+  filter: blur(5px);
+  transform: translate3d(-50%, -50%, 0) rotate(-10deg);
+}
+
+.motion-light-beam {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 210px;
+  height: 16px;
+  border-radius: 999px;
+  opacity: .78;
+  background: linear-gradient(90deg, transparent 3%, rgba(84,152,246,.03) 32%, rgba(188,220,255,.18) 72%, rgba(255,255,255,.82));
+  -webkit-mask-image: linear-gradient(90deg, transparent, #fff 35%, #fff);
+  mask-image: linear-gradient(90deg, transparent, #fff 35%, #fff);
+  filter: blur(2px);
+  transform: translate3d(0, -50%, 0);
+}
+
+.motion-light-echo {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 34px;
+  height: 12px;
+  border-radius: 50%;
+  opacity: .24;
+  background: radial-gradient(ellipse, rgba(211,232,255,.72), rgba(76,142,232,.1) 50%, transparent 74%);
+  filter: blur(4px);
+  transform: translate3d(-50%, -50%, 0);
+}
+
+.motion-light-echo.is-distant {
+  width: 58px;
+  height: 18px;
+  opacity: .13;
+  filter: blur(7px);
+}
+
+.workspace-brand {
+  position: absolute;
+  z-index: 6;
+  left: 46px;
+  top: 38px;
+  display: grid;
+  gap: 3px;
+}
+
+.workspace-brand strong {
+  font-size: 25px;
+  letter-spacing: -.8px;
+}
+
+.workspace-brand span {
+  color: var(--ink-soft);
+  font-size: 13px;
+  letter-spacing: .08em;
+}
+
+.hero-copy {
+  position: relative;
+  z-index: 5;
+  flex: none;
+  max-width: 420px;
+}
+
+.hero-copy h1 {
+  margin: 0;
+  color: #0e1114;
+  font-size: clamp(48px, 4.05vw, 66px);
+  font-weight: 760;
+  line-height: 1.08;
+  letter-spacing: -.035em;
+  text-wrap: balance;
+}
+
+.hero-copy p {
+  margin: 18px 0 0;
+  color: var(--ink-muted);
+  font-size: 18px;
+  letter-spacing: .03em;
+  text-wrap: pretty;
+}
+
+.ambient-status {
+  position: absolute;
+  z-index: 7;
+  right: 46px;
+  top: 195px;
+  width: 190px;
+  min-height: 106px;
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr);
+  align-content: center;
+  gap: 5px 10px;
+  padding: 22px 24px;
+  border-radius: var(--r-md);
+  color: #fff;
+  background: rgba(21, 24, 26, .86);
+  backdrop-filter: blur(16px);
+  box-shadow: var(--e-dark), inset 0 1px 0 rgba(255,255,255,.12);
+  transition: transform .28s var(--ease-premium), background .28s ease;
+}
+
+.ambient-status i {
+  width: 9px;
+  height: 9px;
+  margin-top: 4px;
+  border-radius: 50%;
+  background: #84e32c;
+  box-shadow: 0 0 0 6px rgba(132, 227, 44, .13), 0 0 18px rgba(132, 227, 44, .55);
+}
+
+.ambient-status span {
+  color: rgba(255,255,255,.62);
+  font-size: 12px;
+}
+
+.ambient-status strong {
+  grid-column: 1 / -1;
+  padding-left: 22px;
+  font-size: 20px;
+  font-weight: 610;
+}
+
+.ambient-status.is-running {
+  transform: translateY(-2px);
+  background: rgba(19, 23, 24, .92);
+}
+
+.ambient-status.is-finished {
+  background: rgba(19, 26, 22, .91);
+}
+
+.status-wave {
+  position: absolute;
+  right: 20px;
+  bottom: 22px;
+  height: 15px;
+  display: flex;
+  align-items: end;
+  gap: 3px;
+  opacity: .45;
+}
+
+.status-wave b {
+  width: 2px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--lime);
+  transform-origin: bottom;
+}
+
+.ambient-status.is-running .status-wave {
+  opacity: 1;
+}
+
+.ambient-status.is-running .status-wave b {
+  animation: status-wave .72s ease-in-out infinite alternate;
+}
+
+.ambient-status.is-running .status-wave b:nth-child(2) { animation-delay: -.18s; }
+.ambient-status.is-running .status-wave b:nth-child(3) { animation-delay: -.36s; }
+.ambient-status.is-running .status-wave b:nth-child(4) { animation-delay: -.54s; }
+
+.capability-area {
+  position: relative;
+  z-index: 6;
+  flex: none;
+}
+
+.section-label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.section-label strong {
+  font-size: 15px;
+}
+
+.section-label > i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #82dd2d;
+  box-shadow: 0 0 0 5px rgba(130, 221, 45, .09);
+}
+
+.capability-list {
+  --cap-x: 50%;
+  --cap-y: 50%;
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: rgba(255,255,255,.62);
+  backdrop-filter: blur(18px) saturate(1.05);
+  box-shadow: var(--e1);
+}
+
+.capability-list::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(circle 86px at var(--cap-x) var(--cap-y), rgba(255,255,255,.95), rgba(133,226,47,.1) 42%, transparent 72%);
+  mix-blend-mode: screen;
+  transition: opacity .28s ease;
+}
+
+.capability-list:hover::after,
+.capability-list:focus-within::after {
+  opacity: .72;
+}
+
+.capability-card {
+  position: relative;
+  z-index: 1;
+  isolation: isolate;
+  overflow: hidden;
+  width: 126px;
+  min-height: 134px;
+  display: grid;
+  justify-items: start;
+  align-content: center;
+  padding: 18px 16px;
+  color: #171b1e;
+  background: transparent;
+  cursor: pointer;
+  transition: color .22s ease, background .22s ease;
+}
+
+.capability-card + .capability-card {
+  border-left: 1px solid var(--line);
+}
+
+.capability-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  opacity: 0;
+  background: radial-gradient(circle at 50% 10%, rgba(133, 226, 47, .16), transparent 62%);
+  transition: opacity .22s ease;
+}
+
+/* 能力状态是一块读数板，不是入口：原先是三个 button，长得能点、点了没反应。
+   容器级的指针光（.capability-list::after）保留——那是材质，不是可点的承诺。 */
+.capability-list .capability-card:hover::before {
+  opacity: .55;
+}
+
+.capability-icon {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 13px;
+  border-radius: var(--r-sm);
+  color: #70c822;
+  background: rgba(133, 226, 47, .08);
+}
+
+.capability-icon svg {
+  width: 23px;
+  height: 23px;
+}
+
+.capability-list strong {
+  font-size: 14px;
+}
+
+.capability-list small {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 7px;
+  color: #616b70;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.capability-list small i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #79d628;
+}
+
+.companion-wrap {
+  position: absolute;
+  z-index: 2;
+  right: 40px;
+  top: 44px;
+  width: min(900px, 66vw);
+  height: calc(100% - 48px);
+  pointer-events: none;
+  transform-origin: 55% 62%;
+}
+
+/* 任务态里阅读列压在伴生体身上，卡片之间的缝隙会把人形切成断续的条。
+   用一层与工作区同色的横向渐变把左半边收掉，伴生体从阅读区一侧自然淡入，
+   右侧保持完整的存在感。走 opacity 过渡而不是 mask-image，转场时才不会跳。 */
+.companion-wrap::after {
+  content: "";
+  position: absolute;
+  inset: -4% -2% -4% -6%;
+  z-index: 3;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(101deg, #fbfcfb 4%, rgba(251, 252, 251, .92) 18%, rgba(251, 252, 251, .54) 30%, rgba(251, 252, 251, .15) 38%, transparent 46%);
+  transition: opacity .52s var(--ease-premium);
+}
+
+.workspace.is-task-view .companion-wrap::after {
+  opacity: 1;
+}
+
+.workspace.is-companion-handoff .companion-wrap {
+  z-index: 8;
+}
+
+.workspace.is-companion-handoff .companion-wrap::after {
+  opacity: .22;
+  transition-duration: .12s;
+}
+
+.companion-body {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: block;
+  will-change: transform;
+}
+
+.companion-intro-layer {
+  position: absolute;
+  inset: 0;
+  display: block;
+  opacity: 0;
+  visibility: hidden;
+  /* 起始值用 2D：translate3d 会让这一层在开场结束之后仍然长期占着一个
+     1800x1632 的合成层（Trivial3DTransform）。补间期间 GSAP 自己会加 3D。 */
+  transform: translate(48px, 12px) scale(.976);
+  transform-origin: 55% 62%;
+}
+
+.companion-semantic-layer {
+  position: absolute;
+  inset: 0;
+  display: block;
+  transform-origin: 52% 56%;
+  backface-visibility: hidden;
+}
+
+.companion-pose-layer {
+  position: absolute;
+  inset: 0;
+  display: block;
+  transform-origin: 55% 62%;
+  animation: companion-breathe 8s ease-in-out infinite;
+  will-change: transform;
+}
+
+.companion-figure {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center top;
+  filter: drop-shadow(0 28px 40px rgba(100, 127, 118, .08));
+  transform-origin: 55% 62%;
+}
+
+.companion-shared-figure {
+  /* 不写 backface-visibility: hidden——它会让人物图单独占一个 2280x2112 的合成层
+     （18.4MB），而它的位移全部发生在父层 .companion-pose-layer 上，合进父层即可。 */
+}
+
+/* ===== 开场：七幕编排 =====
+   暗场幕布盖住整个舞台，人物在开场期间抬到幕布之上（两者都在根层叠上下文里，
+   .app-frame / .workspace 都是 z-index: auto，不构成新上下文，所以能直接比较）。
+   工作台在幕布后面照常渲染——那次 40ms 的首帧栅格化因此发生在幕布背后，
+   揭幕时是白拿的。 */
+.intro-veil {
+  position: fixed;
+  z-index: 38;
+  inset: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(118% 78% at 43% 52%, #17211e 0%, #0c1211 52%, #070b0a 100%);
+}
+
+/* 幕一的底幕：一张极暗的深空场（最亮处 #191e1c），开场期间只做一次极缓的推近。
+   它承担的全部工作是把"黑屏"变成"有纵深的地方"，所以只走 transform + opacity，
+   不循环、不视差跟随——指针这时候还没交还给页面。 */
+/* 底幕按类名选中，不用 `.intro-veil > i` 这种位置选择器：幕布里后来加进来的任何一层
+   都会被它连 `opacity: 0` 带底幕图一起套住，而且权重（0,1,1）还高过自己的类规则
+   ——尘埃层就是这么整层不见的（已踩过一次）。 */
+.intro-field {
+  position: absolute;
+  inset: -4%;
+  display: block;
+  opacity: 0;
+  background: url("/assets/opening-field-v1.webp") center / cover no-repeat;
+}
+
+/* 光溢出：核心放电时舞台要接得住这道光，揭幕时这道光再把黑暗推开。
+   它是幕布的子节点——所以永远在幕布之上、在人物（z-39）之下，
+   读起来是光从人物背后漫出来，而不是糊在人物脸上。
+   位置由 JS 按实测的核心视口坐标落位，只补间 transform + opacity。 */
+/* 必须是 fixed：它是 .prototype-stage 的直接子节点，而 stage 是 static，
+   absolute 的它不受 stage 的 overflow: hidden 约束，一个 132vmax 的圆（还带
+   scale 1.62）就把文档撑到 2582×2132——根滚动层因此要为整张"页面"分配两块
+   84MB 的纹理，并且给整个应用外壳挂上横竖两条滚动条。JS 也一直按视口坐标给它
+   落位，本来就该是 fixed。 */
+.intro-glow {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 132vmax;
+  height: 132vmax;
+  display: block;
+  opacity: 0;
+  pointer-events: none;
+  border-radius: 50%;
+  background: radial-gradient(circle,
+    rgba(214, 250, 200, .30) 0%,
+    rgba(150, 220, 120, .15) 18%,
+    rgba(96, 170, 96, .06) 38%,
+    rgba(60, 120, 70, 0) 62%);
+}
+
+/* 幕一的尘埃：底幕不是一张静止的图。14 颗按三档深度漂移的光尘——近的亮而快、
+   远的暗而慢——把"一张背景图"变成"一个有空气的地方"，顺带填掉开场前 0.9s
+   只有一张图在淡入的那段稀薄。只走 transform + opacity，单颗 2–4px，
+   合成开销可以忽略；它们是幕布的子节点，幕布一淡出就跟着走，不用单独退场。 */
+.intro-motes {
+  position: absolute;
+  inset: 0;
+  display: block;
+  pointer-events: none;
+}
+
+.intro-motes > i {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+  opacity: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle,
+    rgba(232, 250, 222, .95) 0%,
+    rgba(150, 220, 120, .34) 46%,
+    rgba(150, 220, 120, 0) 74%);
+}
+
+.app-frame.is-opening .companion-wrap,
+.app-frame.is-opening .companion-nodes {
+  z-index: 39;
+}
+
+/* 点火脉络层跟 .companion-task-form 同一套构造：外轮廓由人物图自身的 alpha 当遮罩，
+   自发光纹理用 screen 合成（所以素材必须是黑底——黑在 screen 下即透明）。 */
+/* 这几层都在 .companion-wrap / .companion-body 里，而这两个节点带 transform 和
+   will-change，各自都是一个独立的混合组——mix-blend-mode: screen 永远够不到幕布，
+   只会在组内跟透明背景相混，等于什么都没做，黑底就实打实地画成一个黑方块。
+   旧版开场看起来没事，只是因为当时幕布是一整片纯黑，黑方块看不出来；
+   加了底幕之后就藏不住了。所以这几层一律改成"黑=透明"的真 alpha：
+   位图素材直接把亮度烘进 alpha 通道，点火层走 SVG 的 luminanceToAlpha。 */
+.companion-ignite,
+.companion-echo,
+.companion-halt {
+  position: absolute;
+  z-index: 4;
+  inset: 0;
+  display: block;
+  opacity: 0;
+  pointer-events: none;
+  filter: url("#ignite-luma-alpha");
+  -webkit-mask: url("/assets/ai-companion.webp") center top / contain no-repeat;
+  mask: url("/assets/ai-companion.webp") center top / contain no-repeat;
+}
+
+/* 只有 0 宽高的滤镜宿主，别让它参与布局 */
+.opening-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+/* 闸门必须只跟纹理相乘，不能把页面也一起乘暗，所以这一层自成混合组：
+   isolation: isolate 圈出一个独立的混合上下文，内部的 multiply 到此为止，
+   组的结果再整体 screen 上页面。少了这一句，multiply 会穿透到工作台上。 */
+.ignite-stack,
+.echo-stack,
+.halt-stack {
+  position: absolute;
+  inset: 0;
+  display: block;
+  isolation: isolate;
+}
+
+.ignite-texture,
+.ignite-gate,
+.echo-texture,
+.echo-gate,
+.halt-texture,
+.halt-gate {
+  position: absolute;
+  inset: 0;
+  display: block;
+  background-position: center top;
+  background-size: contain;
+  background-repeat: no-repeat;
+}
+
+.ignite-texture,
+.echo-texture {
+  background-image: url("/assets/companion-ignite-map-v1.webp");
+}
+
+/* companion-ignite-flow-v2 是从点火图自身脉络算出来的测地距离场：亮 = 先到（核心），
+   暗 = 后到（指尖、头顶），距离沿通路累积而不是到核心的直线距离。
+   brightness 抬阈值、contrast 把它压成一条软硬适中的边，于是"电流沿通路推进"
+   变成一个可补间的标量。旧版用 radial-gradient 遮罩，那是一个同心圆在放大，
+   左右胸和指尖会同时亮——跟脉络的拓扑毫无关系。
+   贴图做过直方图均衡（按脉络像素的到达顺序拉平），所以阈值线性推进 = 脉络线性点亮，
+   节奏完全由 GSAP 的缓动决定，贴图本身不带节奏偏见。 */
+.ignite-gate,
+.echo-gate,
+.halt-gate {
+  background-image: url("/assets/companion-ignite-flow-v2.webp");
+  mix-blend-mode: multiply;
+  /* 静息态对应阈值 1.05（什么都没点亮）。真正的推进由 JS 按阈值写入，
+     不要在这里改成别的数值——它和 GATE_T.start 是一对。 */
+  filter: brightness(.4762) contrast(23.1);
+}
+
+/* 幕二的核心特写与对焦环。位置由 JS 按实测的核心坐标（43.6% / 55.6%）写成像素，
+   量不出有效版式时退回百分比。transform 整条交给 GSAP（xPercent/yPercent），
+   CSS 里不写 translate，否则缩放补间会把居中偏移冲掉。 */
+.opening-core {
+  position: absolute;
+  z-index: 6;
+  left: 44%;
+  top: 56%;
+  width: 30%;
+  aspect-ratio: 1;
+  display: block;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 三层公用的落位：只写长写属性，不用 `background` 简写——简写会把 background-image
+   一并重置成 none，而这条规则的权重（0,1,1）高于下面三条按类名给图的规则（0,1,0），
+   核心特写、对焦环、辉散层会一起变成三个看不见的空盒子（已踩过一次）。 */
+.opening-core > i {
+  position: absolute;
+  inset: 0;
+  display: block;
+  background-position: center;
+  background-size: contain;
+  background-repeat: no-repeat;
+}
+
+/* 三层都从"不在场"起步：容器的 opacity 由 JS 在开演前置为 1，
+   在那之前只靠 CSS 兜住，别让任何一层的可见性依赖两处状态的先后顺序。 */
+.core-flare {
+  opacity: 0;
+  background-image: url("/assets/opening-core-v1.webp");
+}
+
+.core-ring {
+  opacity: 0;
+  background-image: url("/assets/opening-ring-hud-v1.webp");
+}
+
+/* 辉散层：对焦还没合上时，核心是一团没有形状的光；环锁定的同时它收拢、让位给
+   晶体本体。真正的"对焦"就该是这样——先有光、后有形，而不是一个清晰的东西
+   忽然出现。纯径向渐变，不用 filter: blur()：模糊一个大元素每帧都要重绘，
+   而这一拍正好压在点火前面，赌不起。 */
+.core-bloom {
+  opacity: 0;
+  background-image: radial-gradient(circle,
+    rgba(246, 255, 242, .92) 0%,
+    rgba(182, 240, 156, .46) 26%,
+    rgba(150, 220, 120, .13) 52%,
+    rgba(150, 220, 120, 0) 74%);
+}
+
+/* 幕五的接通：从核心扫向每个能力节点的一条细光线，必须先于节点亮起到达。
+   「接通」这件事得有方向——节点自己弹出来只是「出现」，先有一条线从胸口过去，
+   才是「这项能力被接上了」。扫完就撤，工作台上不留线。
+   它挂在 .companion-nodes 里面，直接共用节点那套坐标系和开场期间的 z-index。 */
+.opening-links {
+  position: absolute;
+  inset: 0;
+  display: block;
+  pointer-events: none;
+}
+
+.opening-links > i {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 3px;
+  display: block;
+  opacity: 0;
+  transform-origin: 0 50%;
+  border-radius: 2px;
+  /* 用饱和的中绿，不用近白的线头：这条线一端擦着近白的人物、一端在纯黑的幕上，
+     浅色在人物那边直接消失，纯亮色又和它自己的辉光糊成一团。中绿两边都站得住。 */
+  background: linear-gradient(90deg,
+    rgba(95, 191, 42, 0) 0%,
+    rgba(105, 201, 46, .82) 30%,
+    rgba(126, 213, 48, .96) 72%,
+    rgba(158, 230, 86, 1) 100%);
+  /* 暗边负责亮处（人物上），辉光负责暗处（幕上）——单一颜色在其中一边一定读不出来。 */
+  box-shadow:
+    0 0 0 1px rgba(18, 40, 14, .45),
+    0 0 12px rgba(126, 213, 48, .5);
+}
+
+/* 合焦确认：对焦环收到位的同一拍，一圈细环从核心里推出去再散掉——仪器「咔」地
+   对上焦的那一下。只有一个 1px 的边框在缩放，重绘面积等于零，但这一下把
+   「环在收拢」变成「环收好了」，幕二才有落点。 */
+.core-lock {
+  opacity: 0;
+  background-image: none;
+  border: 1px solid rgba(196, 240, 170, .55);
+  border-radius: 50%;
+}
+
+/* 幕三的火花：沿脉络外冲的信号点。它们要能飞出体外，所以挂在人物遮罩之外，
+   是 .companion-ignite 的兄弟而不是子节点。六颗，一次性，不循环。 */
+.ignite-sparks {
+  position: absolute;
+  z-index: 5;
+  inset: 0;
+  display: block;
+  pointer-events: none;
+}
+
+.ignite-sparks > i {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 6px;
+  height: 6px;
+  display: block;
+  opacity: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle, #f6fff2 0%, #b6f09c 34%, rgba(150, 220, 120, 0) 72%);
+}
+
+/* 幕四的轮廓亮边：椭圆遮罩只长高、不长宽，从核心那一层高度向上下两端推。
+   读起来是形体被勾出来，而不是又一个圆在放大——这一拍原先是缺的，
+   脉络直接切到实体，中间没有"定形"。 */
+.companion-edge {
+  position: absolute;
+  z-index: 5;
+  inset: 0;
+  display: block;
+  opacity: 0;
+  pointer-events: none;
+  background: url("/assets/companion-edge-v1.webp") center top / contain no-repeat;
+  filter: brightness(2.4);
+  -webkit-mask-image: radial-gradient(150% var(--edge-r, 0%) at 50% 56%, #000 54%, transparent 100%);
+  mask-image: radial-gradient(150% var(--edge-r, 0%) at 50% 56%, #000 54%, transparent 100%);
+}
+
+/* 幕六的品牌：落在人物左侧的空处。它同时是一句自我介绍和一次视线引导——
+   幕布升起时视线已经被带到左边，那里正是接下来要用的输入区。
+   固定在幕布层之上（40 > 39），否则会被抬起来的人物压住。 */
+.intro-brand {
+  position: fixed;
+  z-index: 40;
+  left: 11%;
+  top: 50%;
+  max-width: 320px;
+  display: grid;
+  gap: 12px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.intro-brand img {
+  width: 54px;
+  height: 54px;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 14px rgba(131, 224, 46, .22));
+}
+
+/* 字标不是淡入，是被光擦出来的：遮罩从左往右推过去，笔画依次显形。
+   只作用在两个字上，重绘面积极小，跟全屏遮罩不是一个量级。 */
+.intro-brand strong {
+  font-size: 34px;
+  font-weight: 600;
+  letter-spacing: .14em;
+  color: #f2f7f3;
+  -webkit-mask-image: linear-gradient(100deg,
+    #000 0, #000 var(--brand-wipe, 100%),
+    rgba(0, 0, 0, .12) calc(var(--brand-wipe, 100%) + 13%),
+    transparent calc(var(--brand-wipe, 100%) + 26%));
+  mask-image: linear-gradient(100deg,
+    #000 0, #000 var(--brand-wipe, 100%),
+    rgba(0, 0, 0, .12) calc(var(--brand-wipe, 100%) + 13%),
+    transparent calc(var(--brand-wipe, 100%) + 26%));
+}
+
+.intro-brand span {
+  font-size: 13px;
+  letter-spacing: .3em;
+  color: rgba(233, 244, 236, .48);
+}
+
+.intro-brand em {
+  margin-top: 6px;
+  font-size: 15px;
+  font-style: normal;
+  letter-spacing: .06em;
+  color: rgba(182, 240, 156, .82);
+}
+
+@media (max-width: 980px) {
+  .intro-brand { left: 8%; max-width: 240px; }
+  .intro-brand strong { font-size: 27px; }
+}
+
+/* 动效被禁用时开场整段不播（JS 里就不会挂幕布），这里只做兜底。 */
+@media (prefers-reduced-motion: reduce) {
+  .intro-veil { display: none; }
+  .companion-ignite { display: none; }
+  .companion-echo { display: none; }
+  .companion-halt { display: none; }
+  .opening-core { display: none; }
+  .ignite-sparks { display: none; }
+  .companion-edge { display: none; }
+  .intro-brand { display: none; }
+  .intro-glow { display: none; }
+  .opening-links { display: none; }
+}
+
+.companion-task-form {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  display: block;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  -webkit-mask: url("/assets/ai-companion.webp") center top / contain no-repeat;
+  mask: url("/assets/ai-companion.webp") center top / contain no-repeat;
+}
+
+.task-form-region {
+  position: absolute;
+  inset: 0;
+  display: block;
+  opacity: 0;
+  visibility: hidden;
+  background: url("/assets/companion-task-energy-map-v1.webp") center top / contain no-repeat;
+  filter: saturate(1.04) drop-shadow(0 0 8px rgba(52, 207, 242, .24));
+  transform-origin: 43% 56%;
+  /* 三个语义分区各是一整张 1800x1632 的层。常驻 will-change/backface 会把它们
+     一直钉在合成器上（三层就是 33MB），而它们只在切页那 0.3 秒动。交给 GSAP
+     在补间期间提升即可。 */
+}
+
+.task-form-neural {
+  clip-path: polygon(0 32%, 100% 32%, 100% 100%, 0 100%);
+}
+
+.task-form-visor {
+  clip-path: ellipse(24% 27% at 43% 20%);
+  transform-origin: 43% 25%;
+}
+
+.task-form-core {
+  clip-path: ellipse(18% 15% at 42% 57%);
+  transform-origin: 42% 57%;
+  filter: saturate(1.08) drop-shadow(0 0 12px rgba(80, 219, 245, .38));
+}
+
+/* 文件态不是换一张人物图：仍由同一个 companion figure 持续存在，
+   这里只叠加一张透明的记忆网络能量图，语义变化由 GSAP 分区驱动。 */
+.companion-memory-form,
+.companion-file-preview {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  display: block;
+  pointer-events: none;
+  /* 透明资产已经自己控制亮度；normal 能保住淡青线条，screen 在白色人物上会把它洗没。 */
+  mix-blend-mode: normal;
+  -webkit-mask: url("/assets/ai-companion.webp") center top / contain no-repeat;
+  mask: url("/assets/ai-companion.webp") center top / contain no-repeat;
+}
+
+.memory-form-region,
+.file-preview-region {
+  position: absolute;
+  inset: 0;
+  display: block;
+  opacity: 0;
+  visibility: hidden;
+  background: url("/assets/companion-memory-map-v1.webp") center top / contain no-repeat;
+  filter: saturate(1.03) drop-shadow(0 0 9px rgba(86, 214, 226, .22));
+  /* 同 .task-form-region：不做常驻提升。 */
+}
+
+.memory-form-neural,
+.file-preview-neural {
+  clip-path: polygon(0 3%, 100% 3%, 100% 76%, 62% 76%, 54% 66%, 0 66%);
+  transform-origin: 48% 31%;
+}
+
+.memory-form-visor,
+.file-preview-visor {
+  clip-path: ellipse(25% 27% at 43% 20%);
+  transform-origin: 43% 23%;
+}
+
+.memory-form-core,
+.file-preview-core {
+  clip-path: ellipse(20% 17% at 42% 57%);
+  transform-origin: 42% 57%;
+  filter: saturate(1.08) drop-shadow(0 0 14px rgba(88, 222, 236, .4));
+}
+
+.companion-state-handoff {
+  position: absolute;
+  z-index: 5;
+  inset: 0;
+  display: block;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  contain: paint;
+}
+
+.state-handoff-core,
+.state-handoff-ring,
+.state-handoff-axis {
+  position: absolute;
+  display: block;
+  opacity: 0;
+  backface-visibility: hidden;
+}
+
+.state-handoff-core,
+.state-handoff-ring {
+  left: calc(42% - 16px);
+  top: calc(57% - 16px);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  transform-origin: 50% 50%;
+}
+
+.state-handoff-core {
+  border: 1px solid rgba(206, 252, 255, .92);
+  background: rgba(100, 226, 238, .24);
+  box-shadow: 0 0 9px rgba(94, 224, 238, .72), 0 0 24px rgba(116, 221, 232, .36);
+}
+
+.state-handoff-ring {
+  border: 1px solid rgba(117, 226, 236, .58);
+  box-shadow: 0 0 8px rgba(94, 218, 232, .24);
+}
+
+.state-handoff-ring.ring-b {
+  width: 43px;
+  height: 43px;
+  margin: -5.5px;
+  border-color: rgba(124, 218, 55, .48);
+}
+
+.state-handoff-ring.ring-c {
+  width: 54px;
+  height: 54px;
+  margin: -11px;
+  border-color: rgba(126, 228, 235, .3);
+}
+
+.state-handoff-axis {
+  left: calc(42% - 1px);
+  top: 20%;
+  width: 2px;
+  height: 37%;
+  background: rgba(135, 231, 238, .72);
+  box-shadow: 0 0 7px rgba(87, 217, 231, .62), 0 0 18px rgba(105, 213, 225, .3);
+  transform-origin: 50% 100%;
+}
+
+.companion-file-preview {
+  z-index: 4;
+  opacity: 0;
+  visibility: hidden;
+  contain: paint;
+  transform-origin: 44% 42%;
+  backface-visibility: hidden;
+}
+
+.companion-intent-preview {
+  position: absolute;
+  z-index: 4;
+  inset: 0;
+  display: block;
+  opacity: 0;
+  visibility: hidden;
+  contain: paint;
+  pointer-events: none;
+  transform-origin: 43% 48%;
+  backface-visibility: hidden;
+}
+
+.intent-preview-visor,
+.intent-preview-core,
+.intent-preview-path {
+  position: absolute;
+  display: block;
+  opacity: 0;
+  backface-visibility: hidden;
+}
+
+.intent-preview-visor {
+  left: 28%;
+  top: 5.5%;
+  width: 30%;
+  height: 29%;
+  border-radius: 48% 52% 46% 54%;
+  background:
+    radial-gradient(ellipse at 48% 58%, rgba(228, 255, 255, .52), transparent 55%),
+    linear-gradient(96deg, transparent 19%, rgba(111, 235, 255, .48) 48%, transparent 78%);
+  filter: blur(.4px) drop-shadow(0 0 10px rgba(92, 220, 241, .25));
+  transform-origin: 50% 68%;
+}
+
+.intent-preview-core {
+  left: 40.6%;
+  top: 54.8%;
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(178, 246, 255, .62);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(226, 255, 255, .95) 0 16%, rgba(113, 231, 248, .48) 34%, transparent 70%);
+  box-shadow: 0 0 22px rgba(92, 222, 241, .34), inset 0 0 10px rgba(255,255,255,.38);
+  transform: translate(-50%, -50%);
+}
+
+.intent-preview-path {
+  left: var(--path-left);
+  top: 25%;
+  width: 1px;
+  height: var(--path-height);
+  border-radius: 999px;
+  background: linear-gradient(180deg, transparent, rgba(150, 242, 253, .5) 42%, rgba(126, 218, 49, .34), transparent);
+  box-shadow: 0 0 7px rgba(96, 220, 239, .22);
+  transform-origin: 50% 100%;
+}
+
+.intent-preview-path.path-1 { --path-left: 36%; --path-height: 31%; transform: rotate(-8deg); }
+.intent-preview-path.path-2 { --path-left: 43%; --path-height: 34%; transform: rotate(2deg); }
+.intent-preview-path.path-3 { --path-left: 50%; --path-height: 29%; transform: rotate(10deg); }
+
+.task-phase-origins {
+  position: absolute;
+  inset: 0;
+  display: block;
+  pointer-events: none;
+}
+
+.task-phase-origin {
+  position: absolute;
+  left: var(--origin-x);
+  top: var(--origin-y);
+  width: 14px;
+  height: 14px;
+  display: block;
+  border: 2px solid rgba(236, 255, 255, .9);
+  border-radius: 50%;
+  opacity: 0;
+  background: rgba(128, 225, 45, .86);
+  box-shadow: 0 0 0 1px rgba(112, 205, 38, .32), 0 0 18px rgba(103, 220, 225, .42);
+  transform: translate(-50%, -50%);
+  will-change: transform, opacity;
+}
+
+.task-phase-origin::after {
+  content: "";
+  position: absolute;
+  inset: -7px;
+  border: 1px solid rgba(136, 234, 245, .22);
+  border-radius: inherit;
+}
+
+.task-phase-origin.origin-1 { --origin-x: 43%; --origin-y: 20%; }
+.task-phase-origin.origin-2 { --origin-x: 42%; --origin-y: 39%; }
+.task-phase-origin.origin-3 { --origin-x: 43%; --origin-y: 56%; }
+.task-phase-origin.origin-4 { --origin-x: 61%; --origin-y: 63%; }
+
+.task-completion-field {
+  position: absolute;
+  z-index: 5;
+  left: 42%;
+  top: 57%;
+  width: 1px;
+  height: 1px;
+  display: block;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.task-completion-field i {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 72px;
+  height: 72px;
+  display: block;
+  border: 1px solid rgba(132, 230, 48, .54);
+  border-radius: 50%;
+  opacity: 0;
+  box-shadow: inset 0 0 18px rgba(115, 220, 43, .08), 0 0 18px rgba(103, 219, 224, .14);
+  transform: translate(-50%, -50%) scale(.4);
+  will-change: transform, opacity;
+}
+
+.companion-morph-field {
+  position: absolute;
+  z-index: 5;
+  left: 18%;
+  top: 4%;
+  width: 68%;
+  height: 88%;
+  overflow: hidden;
+  opacity: 0;
+  mix-blend-mode: screen;
+  filter: drop-shadow(0 0 12px rgba(91, 229, 255, .32));
+  pointer-events: none;
+}
+
+.morph-band {
+  position: absolute;
+  left: var(--band-left, 50%);
+  bottom: 2%;
+  width: var(--band-width, 3px);
+  height: var(--band-height, 82%);
+  border-radius: 999px;
+  opacity: 0;
+  background: linear-gradient(180deg, transparent, rgba(198,248,255,.95) 26%, rgba(76,216,255,.68) 62%, transparent);
+  box-shadow: 0 0 12px rgba(103, 228, 255, .45);
+  transform-origin: 50% 100%;
+}
+
+.morph-band::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 22%;
+  width: 56px;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(121,235,255,.5), transparent);
+  transform: rotate(var(--branch-angle, 24deg));
+  transform-origin: 0 50%;
+}
+
+.band-1 { --band-left: 20%; --band-height: 64%; --band-width: 2px; --branch-angle: -18deg; }
+.band-2 { --band-left: 34%; --band-height: 78%; --band-width: 2px; --branch-angle: 26deg; }
+.band-3 { --band-left: 46%; --band-height: 96%; --band-width: 4px; --branch-angle: -32deg; }
+.band-4 { --band-left: 57%; --band-height: 88%; --band-width: 2px; --branch-angle: 18deg; }
+.band-5 { --band-left: 70%; --band-height: 72%; --band-width: 3px; --branch-angle: -24deg; }
+.band-6 { --band-left: 82%; --band-height: 58%; --band-width: 2px; --branch-angle: 30deg; }
+
+.core-anchor {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: block;
+  pointer-events: none;
+  will-change: transform;
+}
+
+.companion-wrap.is-running .companion-figure {
+  animation-duration: 4.5s;
+}
+
+.companion-halo {
+  position: absolute;
+  z-index: 1;
+  left: 14%;
+  top: 0;
+  width: 62%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  opacity: .42;
+  background: radial-gradient(circle, rgba(255,255,255,.78) 0 31%, rgba(134, 226, 55, .09) 45%, transparent 69%);
+  transform: scale(.96);
+  transition: opacity .35s ease, transform .6s var(--ease-premium);
+}
+
+.companion-wrap.is-running .companion-halo {
+  opacity: .8;
+  transform: scale(1.035);
+}
+
+.companion-scan {
+  position: absolute;
+  z-index: 3;
+  left: 18%;
+  right: 4%;
+  top: 4%;
+  height: 13%;
+  opacity: 0;
+  border-radius: 50%;
+  background: linear-gradient(180deg, transparent, rgba(163, 240, 89, .2) 48%, rgba(255,255,255,.44) 50%, rgba(163, 240, 89, .1) 54%, transparent);
+  mix-blend-mode: screen;
+  filter: blur(1px);
+}
+
+.companion-wrap.is-running .companion-scan {
+  opacity: 1;
+  animation: companion-scan 2.9s cubic-bezier(.45, 0, .55, 1) infinite;
+}
+
+.core-signal {
+  position: absolute;
+  z-index: 4;
+  left: 43.2%;
+  top: 56.5%;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--red);
+  box-shadow: 0 0 0 0 rgba(255,90,80,.24), 0 0 14px rgba(255,90,80,.58);
+  transform: translate(-50%, -50%);
+  animation: core-idle 3.2s ease-in-out infinite;
+}
+
+.companion-wrap.is-running .core-signal {
+  animation: core-running 1.05s ease-in-out infinite;
+}
+
+.companion-wrap.is-finished .core-signal {
+  background: var(--lime);
+  box-shadow: 0 0 14px rgba(130,221,45,.62);
+  animation: core-finished .42s var(--ease-premium) both;
+}
+
+.companion-nodes {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.companion-node {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.companion-node i {
+  position: relative;
+  width: 21px;
+  height: 21px;
+  display: block;
+  border: 4px solid rgba(255,255,255,.9);
+  border-radius: 50%;
+  background: #87e631;
+  box-shadow: 0 0 0 1px rgba(105, 192, 31, .32), 0 0 22px rgba(120, 225, 39, .35);
+}
+
+.companion-node i::after {
+  content: "";
+  position: absolute;
+  inset: -9px;
+  border: 1px solid rgba(126, 223, 43, .32);
+  border-radius: 50%;
+  opacity: 0;
+}
+
+.companion-node em {
+  padding: 7px 11px;
+  border-radius: var(--r-sm);
+  color: #343a3d;
+  background: rgba(255,255,255,.72);
+  box-shadow: var(--e1);
+  backdrop-filter: blur(12px);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.companion-node.is-current i {
+  background: var(--red);
+  box-shadow: 0 0 0 1px rgba(255, 90, 80, .3), 0 0 25px rgba(255, 90, 80, .55);
+}
+
+.companion-node.is-current i::after {
+  opacity: 1;
+  border-color: rgba(255,90,80,.38);
+  animation: node-scan 1.35s ease-out infinite;
+}
+
+.companion-node.is-complete i {
+  background: var(--lime);
+}
+
+/* .settings-anchors 也带 .companion-nodes 类，会被这条一并选中；而这里用的是
+   animation 简写，会把 animation-play-state 一起重置成 running，
+   于是「设置锚点只在设置页跑」那道门就形同虚设。排除掉。 */
+.companion-nodes:not(.is-running):not(.is-finished):not(.settings-anchors) .node-1 i::after {
+  opacity: 1;
+  animation: node-scan 2.6s ease-out infinite;
+}
+
+.companion-nodes.is-finished .companion-node i::after {
+  opacity: 1;
+  animation: node-finish .72s var(--ease-premium) both;
+}
+
+.companion-nodes.is-finished .node-2 i::after { animation-delay: .08s; }
+.companion-nodes.is-finished .node-3 i::after { animation-delay: .16s; }
+.companion-nodes.is-finished .node-4 i::after { animation-delay: .24s; }
+
+.companion-node.is-current em,
+.companion-node.is-complete em {
+  color: #182019;
+  background: rgba(248,255,244,.82);
+}
+
+.node-1 { right: 315px; top: 135px; }
+.node-2 { right: 485px; top: 430px; }
+.node-3 { right: 273px; top: 556px; }
+.node-4 { right: 120px; top: 665px; }
+
+.workspace.is-task-view > .workspace-glow {
+  opacity: .82;
+  background:
+    radial-gradient(circle 380px at var(--pointer-x) var(--pointer-y), rgba(72, 204, 241, .13), transparent 72%),
+    radial-gradient(circle 480px at 74% 38%, rgba(49, 115, 118, .16), transparent 70%);
+}
+
+.workspace.is-task-view::after {
+  box-shadow: inset 0 0 130px rgba(0, 0, 0, .42), inset 0 1px 0 rgba(255,255,255,.035);
+}
+
+.workspace.is-task-view .workspace-brand strong { color: #f2f7f7; }
+.workspace.is-task-view .workspace-brand span { color: rgba(210,224,226,.52); }
+.workspace.is-task-view .companion-halo {
+  opacity: .38;
+  background: radial-gradient(circle, rgba(123,235,255,.12), rgba(83,194,184,.06) 38%, transparent 70%);
+}
+
+.task-workspace {
+  position: absolute;
+  /* 底部只给紧凑输入条留出实际占位（约 107px + 落位 24px + 间隙），
+     省下的高度全部还给正文。 */
+  inset: 102px 26px calc(var(--composer-actual-h, 116px) + 38px) 26px;
+  z-index: 4;
+  display: grid;
+  grid-template-columns: 238px minmax(420px, 1fr) 252px;
+  gap: 22px;
+}
+
+.task-history,
+.source-rail,
+.answer-card,
+.execution-trace {
+  border: 1px solid rgba(186, 224, 228, .1);
+  background: linear-gradient(145deg, rgba(16, 31, 37, .84), rgba(8, 19, 25, .68));
+  backdrop-filter: blur(28px) saturate(1.08);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.045), 0 20px 50px rgba(0,0,0,.15);
+}
+
+.task-history {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--r-lg);
+}
+
+.task-history-head,
+.source-rail > header {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 18px;
+  border-bottom: 1px solid rgba(177, 216, 222, .09);
+  color: rgba(237,247,248,.82);
+  font-size: 13px;
+  font-weight: 680;
+  letter-spacing: .04em;
+}
+
+.task-history-list {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+}
+
+.task-history-list button {
+  position: relative;
+  min-width: 0;
+  height: 64px;
+  display: grid;
+  grid-template-columns: 6px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  border-radius: var(--r-sm);
+  color: rgba(219,232,234,.62);
+  text-align: left;
+  background: transparent;
+  cursor: pointer;
+  transition: color .22s ease, background .22s ease;
+}
+
+.task-history-list button:hover { color: #f2f8f8; background: rgba(255,255,255,.035); transform: translateX(2px); }
+.task-history-list button.is-current {
+  color: #f4fafa;
+  background: linear-gradient(100deg, rgba(51, 137, 146, .18), rgba(255,255,255,.035));
+  box-shadow: inset 0 0 0 1px rgba(101, 215, 220, .1);
+}
+
+.task-history-list button > i { width: 5px; height: 5px; border-radius: 50%; background: rgba(187,210,212,.3); }
+.task-history-list button.is-current > i { background: #78e6e6; box-shadow: 0 0 12px rgba(88,229,236,.68); }
+.task-history-list button > span { min-width: 0; display: grid; gap: 5px; }
+.task-history-list strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 600; }
+.task-history-list small { color: rgba(194,211,214,.34); font-size: 10px; }
+
+.task-history-foot {
+  margin: auto 12px 12px;
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 14px;
+  border-radius: var(--r-sm);
+  background: rgba(76, 197, 156, .055);
+}
+
+.task-history-foot > i { width: 7px; height: 7px; border-radius: 50%; background: #75e88c; box-shadow: 0 0 12px rgba(117,232,140,.45); }
+.task-history-foot span { display: grid; gap: 3px; }
+.task-history-foot strong { color: rgba(229,243,237,.72); font-size: 10px; }
+.task-history-foot small { color: rgba(191,214,205,.38); font-size: 9px; }
+
+.task-thread {
+  min-width: 0;
+  overflow: auto;
+  padding: 2px 4px 20px;
+  scrollbar-width: none;
+  /* 滚动条是藏起来的，所以边界必须自己说话：上下各一段渐隐，内容溶进容器边缘而不是
+     被硬切一刀，顺带告诉用户"上面/下面还有"。遮罩是静态的，绝不参与补间——渐变
+     遮罩无法插值，一旦补间就会跳（同 .companion-wrap::after 那条教训）。 */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 22px, #000 calc(100% - 30px), transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 22px, #000 calc(100% - 30px), transparent 100%);
+}
+.task-thread::-webkit-scrollbar { display: none; }
+
+.task-thread-head {
+  min-height: 76px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 0 4px;
+}
+
+.task-thread-head h1 { margin: 9px 0 0; color: #f5f9f9; font-size: clamp(23px, 2vw, 31px); line-height: 1.1; letter-spacing: -.025em; }
+.task-eyebrow { display: inline-flex; align-items: center; gap: 7px; color: rgba(190,213,216,.48); font-size: 10px; letter-spacing: .12em; }
+.task-eyebrow i { width: 5px; height: 5px; border-radius: 50%; background: #6ce5eb; box-shadow: 0 0 10px rgba(108,229,235,.6); }
+.task-live {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 12px;
+  padding: 9px 12px;
+  border: 1px solid rgba(111,223,233,.15);
+  border-radius: 999px;
+  color: #bceef0;
+  background: rgba(45,134,142,.14);
+  font-size: 10px;
+}
+.task-live svg { width: 13px; height: 13px; }
+.task-live.is-complete {
+  color: #4c8f21;
+  border-color: rgba(111, 198, 39, .17);
+  background: rgba(126, 218, 48, .11);
+}
+
+.user-brief {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 12px;
+  padding: 17px 18px;
+  border: 1px solid rgba(195,225,228,.08);
+  border-radius: var(--r-md);
+  background: rgba(255,255,255,.025);
+}
+.user-brief > span { width: 30px; height: 30px; display: grid; place-items: center; border-radius: var(--r-sm); color: #e9f6f7; background: rgba(113,213,220,.12); font-size: 11px; font-weight: 700; }
+.user-brief p { margin: 2px 0; color: rgba(218,232,234,.72); font-size: 12px; line-height: 1.8; }
+
+.execution-trace {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0;
+  margin-top: 14px;
+  padding: 12px 18px;
+  border-radius: var(--r-md);
+}
+.execution-line { position: absolute; left: 31px; top: 34px; bottom: 34px; width: 1px; overflow: hidden; background: rgba(123,204,210,.12); }
+.execution-line > i { display: block; width: 100%; height: 100%; background: linear-gradient(90deg, #78e4e6, #5db2ff, rgba(99,203,207,.22)); transform-origin: 0 50%; }
+.execution-step { position: relative; z-index: 1; min-height: 48px; display: flex; justify-content: flex-start; align-items: center; gap: 12px; }
+.execution-step > span { width: 28px; height: 28px; display: grid; place-items: center; border: 1px solid rgba(109,216,221,.18); border-radius: var(--r-xs); color: #75e5df; background: #0d1c22; }
+.execution-step > span svg { width: 13px; height: 13px; }
+.execution-step > div { display: grid; gap: 2px; }
+.execution-step strong { color: rgba(229,240,241,.78); font-size: 10px; }
+.execution-step small { color: rgba(193,211,214,.36); font-size: 9px; }
+/* 当前步骤的心跳挂在 ::after 上，只补间 transform + opacity。
+   原先是直接给 span 补间 box-shadow：那是每帧一次重绘，实测执行期间的绘制
+   从 254 次涨到 1277 次（占整条执行链路 80% 的绘制量）。阴影本身做成静态的，
+   动的只有这一层的透明度和缩放，合成器就能自己跑完。 */
+.execution-step.is-current > span { position: relative; color: #b8efff; border-color: rgba(104,208,255,.34); box-shadow: 0 0 22px rgba(67,188,232,.16); }
+.execution-step.is-current > span::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0;
+  border-radius: inherit;
+  box-shadow: 0 0 0 6px rgba(67,188,232,.06), 0 0 30px rgba(67,188,232,.22);
+  animation: task-step-pulse 1.7s ease-in-out infinite;
+  animation-play-state: paused;
+}
+.workspace.is-task-view .execution-step.is-current > span::after { animation-play-state: running; }
+.execution-step.is-complete > span {
+  color: #63b726;
+  border-color: rgba(105, 190, 39, .17);
+  background: rgba(248, 255, 244, .9);
+}
+
+.task-phase-beam {
+  position: absolute;
+  z-index: 7;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  display: block;
+  opacity: 0;
+  pointer-events: none;
+  transform-origin: 0 50%;
+  will-change: transform, opacity;
+}
+
+/* 光束用真实的导管贴图而不是一条渐变线：贴图自带内芯、外辉和电流节点，
+   横向可无缝拉伸（两端已收到纯黑再烘进 alpha）。高度给到 14px 让外辉有地方铺，
+   芯线仍落在原来那 1px 的几何中线上。 */
+.task-phase-beam::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 14px;
+  background: url("/assets/energy-conduit-v1.webp") center / 100% 100% no-repeat;
+  transform: translateY(-50%);
+}
+
+.task-phase-beam i,
+.task-phase-beam b {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+  border-radius: 50%;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  will-change: transform, opacity;
+}
+
+.task-phase-beam i {
+  width: 10px;
+  height: 10px;
+  background: #eaffff;
+  box-shadow: 0 0 0 5px rgba(103, 225, 216, .1), 0 0 20px rgba(92, 221, 223, .72);
+}
+
+.task-phase-beam b {
+  width: 34px;
+  height: 5px;
+  background: linear-gradient(90deg, transparent, rgba(129, 229, 47, .62), transparent);
+  filter: blur(2px);
+}
+
+.answer-card { min-height: 292px; margin-top: 14px; padding: 20px 22px 18px; border-radius: var(--r-lg); }
+.answer-card.is-generating:not(.is-revealing) .answer-reveal-piece {
+  opacity: .12;
+  transform: translate3d(0, 7px, 0);
+}
+.answer-card.is-complete {
+  box-shadow: var(--edge-strong), var(--e2);
+}
+.answer-brand { display: flex; align-items: center; gap: 10px; }
+.answer-brand span { padding: 5px 8px; border-radius: var(--r-xs); color: #021014; background: #8aebdd; font-size: 10px; font-weight: 800; }
+.answer-brand small { color: rgba(190,211,214,.4); font-size: 9px; }
+.answer-intro { margin: 16px 0 0; color: rgba(208,225,227,.68); font-size: 11px; }
+.answer-card h2 { margin: 16px 0 14px; color: #f2f8f8; font-size: 20px; letter-spacing: -.01em; }
+.answer-copy { display: grid; gap: 12px; }
+.answer-copy p { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 10px; margin: 0; }
+.answer-copy b { color: rgba(114,222,222,.48); font-size: 18px; font-weight: 650; line-height: 1; }
+.answer-copy p > span { color: rgba(205,222,224,.6); font-size: 11px; line-height: 1.65; }
+.answer-copy strong { display: block; margin-bottom: 2px; color: rgba(238,247,247,.9); font-size: 12px; }
+.answer-followup { display: flex; align-items: center; gap: 7px; margin: 17px 0 0 36px; padding: 0; color: #7bdfe7; background: transparent; font-size: 10px; cursor: pointer; }
+.answer-followup svg { width: 13px; height: 13px; transition: transform .22s var(--ease-premium); }
+.answer-followup:hover svg { transform: translateX(3px); }
+
+.source-rail {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--r-lg);
+}
+.source-rail > header small { min-width: 23px; height: 23px; display: grid; place-items: center; border-radius: var(--r-xs); color: rgba(201,229,232,.6); background: rgba(105,214,220,.08); font-size: 9px; }
+.source-list { display: grid; gap: 8px; padding: 12px; }
+/* 来源是这次执行读了什么的说明，不是入口：原先是 button，长得能点、点了没有任何反应。 */
+.source-item { position: relative; display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 10px; align-items: center; min-height: 66px; padding: 10px; border: 1px solid rgba(181,221,225,.07); border-radius: var(--r-sm); color: rgba(227,239,240,.78); text-align: left; background: rgba(255,255,255,.025); }
+.source-item > span { width: 34px; height: 34px; display: grid; place-items: center; border-radius: var(--r-sm); color: #74dde4; background: rgba(97,205,213,.08); }
+.source-list svg { width: 18px; height: 18px; }
+.source-item > div { min-width: 0; display: grid; gap: 5px; }
+.source-list strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
+.source-list small { color: rgba(192,211,214,.34); font-size: 8px; }
+.source-list em { position: absolute; right: 8px; top: 8px; color: rgba(130,223,229,.25); font-size: 8px; font-style: normal; }
+/* 来源空态：这次没引用资料时给一句解释和下一步，而不是留一栏空白。 */
+.source-empty { display: grid; justify-items: center; gap: 7px; margin: 22px 12px; padding: 22px 14px; border: 1px dashed rgba(181,221,225,.12); border-radius: var(--r-md); text-align: center; }
+.source-empty svg { width: 22px; height: 22px; color: rgba(150,200,205,.34); }
+.source-empty strong { color: rgba(224,238,240,.7); font-size: 10px; }
+.source-empty small { color: rgba(187,211,214,.34); font-size: 8px; line-height: 1.5; }
+
+/* 停止：状态标签、停住的那一格、以及顶掉回答的那张卡，共用一套中性灰——
+   停止不是错误，不该用警示色，但也不能还穿着"正在生成"的青柠。 */
+.task-live.is-stopped { color: rgba(216,226,228,.72); background: rgba(255,255,255,.05); }
+.execution-step.is-stopped > span { color: rgba(216,226,228,.66); background: rgba(255,255,255,.06); box-shadow: none; }
+.execution-step.is-stopped strong { color: rgba(226,236,238,.8); }
+.answer-card.is-stopped { border-style: dashed; }
+.answer-card.is-stopped .answer-intro { color: rgba(211,224,226,.62); }
+.task-history-list button:disabled { opacity: .4; cursor: default; }
+.task-history-list button:disabled:hover { background: transparent; }
+
+.source-trust { margin: auto 12px 12px; display: grid; grid-template-columns: 28px minmax(0, 1fr) 16px; gap: 10px; align-items: center; padding: 12px; border-top: 1px solid rgba(182,219,222,.07); }
+.source-trust > i { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; color: #83e7b3; background: rgba(78,199,135,.1); }
+.source-trust svg { width: 13px; height: 13px; }
+.source-trust > svg { color: rgba(105,130,134,.42); }
+.source-trust > span { display: grid; gap: 3px; }
+.source-trust strong { color: rgba(224,240,232,.68); font-size: 9px; }
+.source-trust small { color: rgba(187,211,200,.34); font-size: 8px; line-height: 1.4; }
+
+/* The approved task mock keeps the homepage's quiet light material language. */
+.workspace.is-task-view > .workspace-glow {
+  opacity: .72;
+  background:
+    radial-gradient(circle 380px at var(--pointer-x) var(--pointer-y), rgba(131, 229, 45, .09), transparent 72%),
+    radial-gradient(circle 520px at 78% 42%, rgba(97, 209, 198, .08), transparent 72%);
+}
+.workspace.is-task-view::after { box-shadow: inset 0 0 120px rgba(108, 126, 128, .045); }
+.workspace.is-task-view .workspace-brand strong { color: #15191b; }
+.workspace.is-task-view .workspace-brand span { color: var(--ink-soft); }
+.workspace.is-task-view .companion-halo {
+  opacity: .38;
+  background: radial-gradient(circle, rgba(255,255,255,.82), rgba(128,223,54,.075) 42%, transparent 70%);
+}
+
+.task-history,
+.source-rail,
+.answer-card,
+.execution-trace {
+  border-color: var(--line-strong);
+  /* 渐变的 145deg 把最透明的一角正对着伴生体所在的右下方，而浅色态又关掉了
+     backdrop-filter，人形轮廓因此毫无柔化地压在正文上。阅读区改为接近实色，
+     伴生体只在卡片之间的缝隙和卡片之外继续在场。 */
+  background: linear-gradient(145deg, rgba(255,255,255,.97), rgba(249,252,251,.93));
+  backdrop-filter: none;
+  box-shadow: var(--edge), var(--e2);
+}
+.task-history-head,
+.source-rail > header {
+  border-bottom-color: rgba(33,47,50,.075);
+  color: #252b2e;
+}
+.task-history-list button { color: #596367; }
+.task-history-list button:hover { color: #181d1f; background: rgba(255,255,255,.64); }
+.task-history-list button.is-current {
+  color: #171c1e;
+  background: linear-gradient(100deg, rgba(131,225,49,.105), rgba(255,255,255,.76));
+  box-shadow: inset 0 0 0 1px rgba(107,190,35,.105);
+}
+.task-history-list button > i { background: rgba(78,91,95,.22); }
+.task-history-list button.is-current > i { background: #79d92c; box-shadow: 0 0 12px rgba(121,217,44,.5); }
+.task-history-list small { color: var(--ink-soft); }
+.task-history-foot { background: rgba(118,210,45,.055); }
+.task-history-foot > i { background: #72d82c; box-shadow: 0 0 12px rgba(114,216,44,.36); }
+.task-history-foot strong { color: #536057; }
+.task-history-foot small { color: var(--ink-soft); }
+.task-thread-head h1 { color: #111518; }
+.task-eyebrow { color: var(--ink-soft); }
+.task-eyebrow i { background: #79d92e; box-shadow: 0 0 10px rgba(121,217,46,.46); }
+/* 这两块直接坐在伴生体的头肩位置上，半透明背景会让文字糊在人形轮廓上。 */
+.task-live { color: var(--leaf-text); border-color: rgba(113,200,37,.16); background: linear-gradient(150deg, rgba(246,253,240,.96), rgba(238,250,229,.92)); }
+.user-brief { border-color: var(--line); background: rgba(255,255,255,.92); box-shadow: var(--e1); }
+.user-brief > span { color: #253027; background: rgba(127,218,47,.11); }
+.user-brief p { color: #4f595d; }
+.execution-line { background: rgba(75,105,110,.13); }
+.execution-line > i { background: linear-gradient(90deg, #86df35, #79d62f, rgba(119,204,46,.2)); }
+.execution-step > span { color: #6bc426; border-color: rgba(106,188,37,.17); background: rgba(255,255,255,.86); box-shadow: 0 4px 10px rgba(51,67,70,.04); }
+.execution-step strong { color: #384044; }
+.execution-step small { color: var(--ink-soft); }
+.execution-step.is-current > span { color: #69bd2a; border-color: rgba(107,193,37,.3); box-shadow: 0 0 20px rgba(107,193,37,.12); }
+.execution-step.is-current > span::after { box-shadow: 0 0 0 5px rgba(107,193,37,.07), 0 0 26px rgba(107,193,37,.2); }
+.answer-brand span { color: #274116; background: #dff6cf; }
+.answer-brand small { color: var(--ink-soft); }
+.answer-intro { color: var(--ink-muted); }
+.answer-card h2 { color: #181d20; }
+.answer-copy b { color: #79c936; }
+.answer-copy p > span { color: var(--ink-muted); }
+.answer-copy strong { color: #252b2e; }
+.answer-followup { color: var(--leaf-text); }
+.source-rail > header small { color: var(--leaf-text); background: rgba(119,204,48,.09); }
+.source-item { color: #3d4649; border-color: var(--line); background: rgba(255,255,255,.58); }
+.source-item > span { color: #6bc529; background: rgba(119,207,44,.09); }
+.source-list small { color: var(--ink-soft); }
+.source-list em { color: var(--leaf-text); }
+.source-empty { border-color: rgba(40,53,56,.12); }
+.source-empty svg { color: rgba(90,120,100,.3); }
+.source-empty strong { color: #536058; }
+.source-empty small { color: var(--ink-soft); }
+.task-live.is-stopped { color: #5c6663; background: rgba(30,48,52,.05); }
+.execution-step.is-stopped > span { color: #5c6663; background: rgba(30,48,52,.06); }
+.execution-step.is-stopped strong { color: #303836; }
+.answer-card.is-stopped .answer-intro { color: #5c6663; }
+
+.source-trust { border-top-color: rgba(40,53,56,.07); }
+.source-trust > i { color: #64b728; background: rgba(102,190,40,.09); }
+.source-trust strong { color: #536058; }
+.source-trust small { color: var(--ink-soft); }
+
+.work-panel {
+  position: absolute;
+  inset: 0;
+}
+
+.task-panel {
+  z-index: 1;
+}
+
+.file-panel {
+  z-index: 2;
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.settings-panel {
+  z-index: 3;
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 设置页采用已确认的 Quiet Preferences 方向：以分隔线组织连续表面，
+   把人物留在右侧做守护者，不再用后台式大卡片堆叠。
+   第三列不是留白，是伴生体的地盘：正文栏（第二列）在任何断点下都不能压到人物身上，
+   否则浅色态关掉 backdrop-filter 之后，人形轮廓会直接透过正文——这条和任务页
+   「阅读列必须能挡住伴生体」是同一条规则，只是设置页用留白而不是实色卡片来实现。 */
+.settings-workspace {
+  position: absolute;
+  inset: 28px 48px 34px 0;
+  z-index: 4;
+  display: grid;
+  grid-template-columns: 124px minmax(480px, 650px) minmax(90px, 1fr);
+  grid-template-rows: 92px minmax(0, 1fr);
+  column-gap: 98px;
+  overflow: hidden;
+  color: #202629;
+}
+
+.settings-header {
+  grid-column: 2;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 24px;
+  padding: 0 2px 18px 0;
+  border-bottom: 1px solid var(--line-strong);
+}
+
+/* 页面标题和任务页的 .task-thread-head h1 用同一档字号：两个页面的标题不该差 3px，
+   而且它和顶栏品牌块并排，再大就会跟"元枢"抢。 */
+.settings-header h1 {
+  margin: 0;
+  color: #171d20;
+  font-size: clamp(23px, 2vw, 31px);
+  font-weight: 680;
+  line-height: 1.1;
+  letter-spacing: -.03em;
+}
+
+.settings-sync {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: #6c767a;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.settings-sync i { width: 7px; height: 7px; border-radius: 50%; background: #7bd12e; box-shadow: 0 0 0 4px rgba(123, 209, 46, .09); transition: background .24s ease, box-shadow .24s ease; }
+.settings-sync.is-dirty i { background: #f0aa3f; box-shadow: 0 0 0 4px rgba(240, 170, 63, .1); }
+
+.settings-categories {
+  position: relative;
+  isolation: isolate;
+  grid-column: 1;
+  grid-row: 2;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 23px 18px 0 0;
+  border-right: 1px solid var(--line);
+}
+
+/* 高亮块的材质与左栏导航的 .nav-glass 一致：白玻璃 + 一条 3px 青柠竖条。
+   位置由 GSAP 补间，CSS 因此不碰 transform。 */
+.settings-rail-glass {
+  position: absolute;
+  z-index: 0;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 38px;
+  overflow: hidden;
+  border: 1px solid var(--glass-line);
+  border-radius: var(--r-sm);
+  background: linear-gradient(145deg, rgba(255,255,255,.95), rgba(246,251,249,.66));
+  box-shadow: var(--e2), var(--edge-strong);
+  pointer-events: none;
+}
+
+.settings-rail-glass::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 11px;
+  width: 3px;
+  height: 16px;
+  border-radius: var(--r-xs);
+  background: #85e529;
+  box-shadow: 0 0 12px rgba(133, 229, 41, .6);
+}
+
+.settings-categories > button {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--r-sm);
+  color: var(--ink-soft);
+  text-align: left;
+  background: transparent;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  /* transform 归 GSAP 的按压管线所有，CSS 只留颜色通道，两边不抢。 */
+  transition: color .2s ease;
+}
+
+.settings-categories > button svg { width: 16px; height: 16px; flex: 0 0 auto; }
+.settings-categories > button:hover { color: #31383b; }
+.settings-categories > button.is-active { color: #1a2124; font-weight: 680; }
+.settings-categories > button.is-active svg { color: #5aa524; }
+
+.settings-account {
+  margin-top: auto;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  padding: 14px 10px 18px;
+  border-top: 1px solid var(--line);
+}
+.settings-account > svg { width: 27px; height: 27px; color: #6fb72f; }
+.settings-account > span { min-width: 0; display: grid; gap: 3px; }
+.settings-account strong { color: #3f4a41; font-size: 10px; }
+.settings-account small { color: var(--ink-faint); font-size: 9px; }
+
+.settings-content {
+  position: relative;
+  grid-column: 2;
+  grid-row: 2;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 20px 2px 0 0;
+  scrollbar-width: none;
+  /* 只做顶部渐隐：底部有 position: sticky 的保存条，加底部渐隐会把它一起吃掉。 */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 20px, #000 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 20px, #000 100%);
+}
+.settings-content::-webkit-scrollbar { display: none; }
+
+.settings-section { margin: 0 0 22px; }
+
+/* 段落标题走首页「能力状态」那一套 .section-label（15px + 青柠点），
+   不再自造一条 10px 字距的 eyebrow——同一层级的东西在两个页面不该有两种写法。 */
+.settings-section > .section-label { margin-bottom: 8px; }
+.settings-section > .section-label strong { color: #2b3336; }
+
+.settings-row {
+  width: 100%;
+  min-height: 62px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 10px 2px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  color: inherit;
+  text-align: left;
+  background: transparent;
+  font: inherit;
+}
+
+/* 首个 <span> 不一定是第一个子元素（隐私行前面还有图标），
+   按位置选会漏掉它，标题和说明就会挤成一行。 */
+.settings-row > span:not(.settings-row-value) { min-width: 0; display: grid; gap: 5px; }
+.settings-row strong { color: #272e31; font-size: 12px; font-weight: 660; }
+.settings-row small { color: var(--ink-faint); font-size: 9px; line-height: 1.45; }
+
+/* 三个分段选择器等宽，右边缘因此在整列上对齐；等宽也让玻璃块只需要补间 x。 */
+.settings-segmented {
+  position: relative;
+  isolation: isolate;
+  flex: 0 0 auto;
+  width: 248px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 3px;
+  padding: 3px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: rgba(236, 241, 239, .7);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.5);
+}
+
+/* 材质与输入条的 .mode-glass / .mode-caustic 同源：标签和图标不动，只有玻璃在下面滑。 */
+.settings-seg-glass {
+  position: absolute;
+  z-index: 0;
+  left: 3px;
+  top: 3px;
+  width: calc((100% - 6px - 6px) / 3);
+  height: calc(100% - 6px);
+  border: 1px solid var(--glass-line);
+  border-radius: var(--r-xs);
+  background:
+    linear-gradient(145deg, rgba(255,255,255,.95), rgba(255,255,255,.55)),
+    rgba(246, 249, 248, .6);
+  box-shadow: var(--e1), var(--edge-strong);
+  transform-origin: 50% 50%;
+  will-change: transform;
+}
+
+.settings-seg-caustic {
+  position: absolute;
+  z-index: 1;
+  left: 3px;
+  top: 3px;
+  width: calc((100% - 6px - 6px) / 3);
+  height: calc(100% - 6px);
+  border-radius: var(--r-xs);
+  pointer-events: none;
+  opacity: .5;
+  background: linear-gradient(105deg, transparent 8%, rgba(255,255,255,.76) 34%, transparent 58%, rgba(158,211,255,.13));
+  transform-origin: 50% 50%;
+  will-change: transform;
+}
+
+.settings-segmented button {
+  position: relative;
+  z-index: 2;
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: var(--r-xs);
+  color: var(--ink-muted);
+  background: transparent;
+  font: inherit;
+  font-size: 11px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color .2s ease;
+}
+.settings-segmented button svg { width: 13px; height: 13px; }
+/* 选中态用蓝色：整个应用里"选择/模式"是蓝的（输入条的自动/快速/深度、主按钮），
+   青柠留给能力与状态（节点、能力卡、开关的开启态）。 */
+.settings-segmented button.is-selected { color: #1f63d5; font-weight: 680; }
+.settings-segmented button.is-selected svg { filter: drop-shadow(0 1px 2px rgba(31,99,213,.2)); }
+.settings-segmented button:hover:not(.is-selected) { color: #2c3336; }
+.settings-segmented button:focus-visible { outline: none; }
+.settings-segmented:has(button:focus-visible) { outline: 2px solid var(--focus); outline-offset: 3px; }
+
+.settings-switch {
+  position: relative;
+  flex: 0 0 auto;
+  width: 42px;
+  height: 24px;
+  padding: 0;
+  /* 填充层要被轨道的胶囊裁住，否则 scaleX 到 1 时右端会顶出圆角 */
+  overflow: hidden;
+  border: 0;
+  border-radius: 999px;
+  background: #d9dedc;
+  box-shadow: inset 0 1px 3px rgba(40, 52, 55, .12);
+  cursor: pointer;
+}
+/* 打开不是整条轨道换色，而是青柠被拨块推着注满。颜色是常驻的，
+   动的只有 scaleX，归 GSAP 独占——所以这里不写 transition，也不写 .is-on 的换色。 */
+.settings-switch .switch-fill {
+  position: absolute;
+  inset: 0;
+  display: block;
+  border-radius: inherit;
+  background: #79cf31;
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+}
+/* 滑块位移归 GSAP，CSS 不再挂 transition: transform。 */
+.settings-switch .switch-knob { position: absolute; z-index: 1; left: 3px; top: 3px; width: 18px; height: 18px; display: block; border-radius: 50%; background: #fff; box-shadow: 0 1px 1px rgba(var(--shade), .14), 0 2px 5px rgba(var(--shade), .2); }
+
+/* 整行按钮不进按压委托：648px 宽的行做 .955 缩放会明显位移。
+   它的反馈是背景与箭头，和资料库里"整条可点"的行为一致。 */
+/* 只读的当前值：右对齐、跟偏好控件同一条基线，但没有指针手势也没有箭头。 */
+.settings-row-value { display: flex; align-items: center; gap: 7px; color: var(--ink-muted); font-size: 10px; white-space: nowrap; }
+
+.settings-privacy-note { justify-content: flex-start; gap: 13px; }
+.settings-privacy-note > svg { width: 27px; height: 27px; flex: 0 0 auto; color: #6dbb2d; }
+
+/* 正文可以滚，保存却不该跟着滚出视野——粘在正文列底部，背景与工作区同色收边。 */
+.settings-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-top: 4px;
+  padding: 16px 0 20px;
+  background: linear-gradient(180deg, rgba(251,252,251,0), #fbfcfb 18%, #fbfcfb);
+}
+
+/* 上缘一条发丝线，让它读起来是一条操作条，而不是浮在正文上的两个按钮。 */
+.settings-actions::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 12px;
+  height: 1px;
+  background: rgba(35, 48, 51, .075);
+}
+
+/* 主按钮对齐 .start-button 的语汇：纯色蓝、8px 阴影、真实 hover、
+   disabled 换纯色而不是把整块冲淡（冲淡读起来像坏掉）。 */
+.settings-save {
+  position: relative;
+  min-width: 130px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: var(--r-sm);
+  color: #fff;
+  background: var(--blue);
+  box-shadow: var(--e-accent);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 660;
+  cursor: pointer;
+  transition: background .2s ease, box-shadow .2s ease;
+}
+/* 保存的收拢环：从按钮外圈收进来一圈细环，落定即消失。
+   按钮本体的按压缩放归事件委托所有，这一层只管自己的 transform。 */
+.settings-save .save-ring {
+  position: absolute;
+  inset: -6px;
+  display: block;
+  pointer-events: none;
+  opacity: 0;
+  border: 1px solid rgba(79, 148, 29, .9);
+  border-radius: calc(var(--r-sm) + 6px);
+}
+
+.settings-save:hover:not(:disabled) { background: #1d61d5; box-shadow: var(--e-accent-hover); }
+.settings-save svg { width: 14px; height: 14px; }
+.settings-save:disabled { color: rgba(255,255,255,.82); background: #a7bcdd; box-shadow: none; cursor: default; }
+.settings-save.is-saved { background: #4f941d; box-shadow: 0 6px 8px rgba(79, 148, 29, .22); }
+
+.settings-reset { padding: 0 4px; border: 0; color: var(--ink-soft); background: transparent; font: inherit; font-size: 11px; cursor: pointer; transition: color .2s ease; }
+.settings-reset:hover { color: #383f42; }
+
+.workspace.is-settings-view .composer-dock {
+  pointer-events: none !important;
+}
+
+.workspace.is-settings-view .companion-wrap { opacity: .56; }
+.workspace.is-settings-view .companion-halo { opacity: .48; }
+/* 遮罩只改透明度：渐变无法插值，换 background 会在转场首帧整块重绘。 */
+.workspace.is-settings-view .companion-wrap::after { opacity: .92; }
+
+.settings-anchors {
+  opacity: 0;
+  visibility: hidden;
+}
+.settings-anchors .companion-node i { background: #7ed530; }
+/* 锚点必须落在正文列右缘（第二列结束处）之外，否则标签会压在偏好控件上。 */
+.settings-anchors .node-1 { right: 300px; top: 214px; }
+.settings-anchors .node-2 { right: 246px; top: 496px; }
+.settings-anchors .node-3 { right: 196px; top: 742px; }
+.settings-anchors .node-1 i::after { opacity: 1; animation: node-scan 2.8s ease-out infinite; animation-play-state: paused; }
+.workspace.is-settings-view .settings-anchors .node-1 i::after { animation-play-state: running; }
+
+.files-workspace {
+  --memory-line: rgba(119, 205, 47, .23);
+  --memory-cyan: rgba(93, 212, 224, .3);
+  position: absolute;
+  /* 顶部让工具条的垂直中心对齐品牌块的「元枢」那一行 */
+  inset: 29px 270px calc(var(--composer-actual-h, 116px) + 38px) 160px;
+  z-index: 4;
+  min-width: 0;
+  display: grid;
+  grid-template-rows: 52px minmax(0, 1fr) 132px;
+  gap: 12px;
+  color: #161b1e;
+}
+
+/* 顶栏只保留一个标题——全局的 .workspace-brand。页面名交给左栏导航的高亮，
+   和任务页保持一致（任务页的页面标题也在工作区内部，不在顶栏）。
+   这里只放工具：搜索、隐私标签、上传。 */
+.files-head {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.files-search {
+  flex: 0 1 420px;
+}
+
+.files-privacy {
+  flex: none;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 620;
+  white-space: nowrap;
+}
+
+.files-privacy::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #7edb2d;
+  box-shadow: 0 0 0 4px rgba(126, 219, 45, .1);
+}
+
+.files-search {
+  height: 44px;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) 26px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 13px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  color: var(--ink-soft);
+  background: rgba(255,255,255,.72);
+  box-shadow: var(--edge), var(--e1);
+  transition: border-color .25s ease, box-shadow .25s ease, background .25s ease;
+}
+
+.files-search:focus-within {
+  border-color: rgba(119, 205, 47, .28);
+  background: rgba(255,255,255,.9);
+  box-shadow: var(--edge-strong), 0 0 0 4px rgba(124,211,48,.07), var(--e2);
+}
+
+.files-search > svg { width: 18px; height: 18px; }
+.files-search input { min-width: 0; border: 0; outline: 0; color: #242a2d; background: transparent; font: inherit; font-size: 13px; }
+.files-search input::placeholder { color: var(--ink-soft); }
+.files-search button { width: 26px; height: 26px; display: grid; place-items: center; padding: 0; border-radius: var(--r-xs); color: var(--ink-soft); background: transparent; cursor: pointer; }
+.files-search button:hover { color: #252b2e; background: rgba(41,51,55,.055); }
+.files-search button svg { width: 13px; height: 13px; }
+
+.files-upload-button {
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 18px;
+  border-radius: var(--r-sm);
+  color: #fff;
+  background: #236de9;
+  box-shadow: var(--e-accent), inset 0 1px 0 rgba(255,255,255,.26);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 680;
+  transform-origin: 50% 65%;
+  transition: box-shadow .24s var(--ease-premium), background .2s ease;
+}
+
+.files-upload-button:hover { background: #1d63dc; box-shadow: var(--e-accent-hover), inset 0 1px 0 rgba(255,255,255,.3); }
+.files-upload-button svg { width: 17px; height: 17px; }
+
+.memory-stage {
+  position: relative;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(580px, 1fr) minmax(286px, 320px);
+  gap: 16px;
+}
+
+.memory-orbits {
+  min-width: 0;
+  min-height: 0;
+  width: calc(100% + 128px);
+  margin-left: -128px;
+  display: grid;
+  grid-template-rows: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  transform-origin: 100% 50%;
+  transition: opacity .26s ease, transform .34s var(--ease-premium), filter .3s ease;
+}
+
+.memory-orbit {
+  position: relative;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 138px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  border: 1px solid rgba(100, 199, 50, .19);
+  /* 椭圆圆角（50% / 48%）在两端收得太快：卡片是矩形，右端那张的上下角会戳出轮廓。
+     改成胶囊，两端是等高的半圆，内容才包得住。 */
+  border-radius: 999px;
+  background: linear-gradient(96deg, rgba(250,253,249,.54), rgba(255,255,255,.78) 44%, rgba(248,253,251,.5));
+  box-shadow: var(--edge), var(--e1);
+  transform-origin: 54% 50%;
+  backface-visibility: hidden;
+  transition: border-color .28s ease, box-shadow .28s ease, background .28s ease;
+}
+
+.files-workspace.is-search-active .memory-orbit {
+  border-color: rgba(99, 204, 219, .27);
+  background: linear-gradient(96deg, rgba(249,253,251,.58), rgba(255,255,255,.86) 44%, rgba(246,252,252,.58));
+  box-shadow: var(--edge), var(--e2);
+}
+
+.files-workspace.is-search-empty .memory-orbits {
+  opacity: .48;
+  filter: saturate(.72);
+  transform: scaleX(.986);
+}
+
+.files-workspace.is-dragging .memory-orbit:first-child {
+  border-color: rgba(118, 216, 46, .36);
+  box-shadow: var(--edge-strong), 0 0 0 5px rgba(119,207,45,.045), var(--e2);
+}
+
+.memory-orbit::before,
+.memory-orbit::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  border-radius: 50%;
+}
+
+.memory-orbit::before {
+  inset: 14px 72px 8px 142px;
+  border-top: 1px solid rgba(112, 213, 43, .18);
+  border-bottom: 1px solid rgba(96, 208, 215, .12);
+  box-shadow:
+    0 24px 0 -1px rgba(255,255,255,.52),
+    0 25px 0 -1px rgba(111, 207, 47, .13),
+    0 34px 0 -1px rgba(255,255,255,.32),
+    0 35px 0 -1px rgba(92, 202, 218, .09);
+  transform: perspective(500px) rotateX(63deg) scaleX(.92);
+  transform-origin: 50% 50%;
+}
+
+.memory-orbit::after {
+  right: 14px;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  border: 1px solid rgba(126, 221, 45, .58);
+  background: rgba(247,255,240,.94);
+  box-shadow: 0 0 0 5px rgba(126,221,45,.06), 0 0 14px rgba(126,221,45,.24);
+  transform: translateY(-50%);
+}
+
+.memory-orbit[data-collection="project"] { border-color: rgba(88, 202, 218, .18); }
+.memory-orbit[data-collection="project"]::before { border-top-color: rgba(79, 201, 225, .2); }
+
+.memory-orbit > header {
+  position: relative;
+  z-index: 2;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 22px minmax(0, auto) 6px;
+  align-items: center;
+  gap: 8px;
+  color: #202629;
+}
+
+.memory-orbit > header svg { width: 19px; height: 19px; color: #6dcc29; }
+.memory-orbit > header strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.memory-orbit > header i { width: 5px; height: 5px; border-radius: 50%; background: #7cdb2d; box-shadow: 0 0 8px rgba(124,219,45,.4); }
+
+.memory-file-row {
+  position: relative;
+  z-index: 2;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  overflow: visible;
+  perspective: 760px;
+  perspective-origin: 48% 42%;
+}
+
+.memory-file {
+  --file-light-x: 50%;
+  --file-light-y: 42%;
+  position: relative;
+  isolation: isolate;
+  min-width: 0;
+  height: 54px;
+  display: grid;
+  grid-template-columns: 31px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  overflow: visible;  /* 不能改 hidden：::before 是向外扩 11px 的柔光，会被裁掉。涟漪由 .memory-ripple-clip 单独裁 */
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  color: #2d3437;
+  text-align: left;
+  background: rgba(255,255,255,.76);
+  box-shadow: var(--e1), var(--edge);
+  cursor: pointer;
+  transform-origin: 50% 72%;
+  backface-visibility: hidden;
+  transform-style: preserve-3d;
+  transition: border-color .22s ease, color .22s ease, background .22s ease, box-shadow .22s ease;
+}
+
+.memory-file::before,
+.memory-file::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+.memory-file::before {
+  z-index: -1;
+  left: -11px;
+  right: -11px;
+  bottom: -12px;
+  height: 27px;
+  opacity: 0;
+  background:
+    radial-gradient(ellipse at 38% 40%, rgba(139, 236, 71, .27), rgba(139, 236, 71, .07) 38%, transparent 68%),
+    radial-gradient(ellipse at 67% 58%, rgba(74, 211, 228, .19), rgba(74, 211, 228, .05) 42%, transparent 72%);
+  filter: blur(7px);
+  transform: translateY(4px) scale(.76, .64);
+  transition: opacity .28s ease, transform .42s cubic-bezier(.2,.8,.2,1);
+}
+
+.memory-file::after {
+  z-index: 0;
+  inset: 1px;
+  opacity: 0;
+  background:
+    radial-gradient(circle at var(--file-light-x) var(--file-light-y), rgba(255,255,255,.92), rgba(255,255,255,.22) 30%, transparent 58%),
+    linear-gradient(115deg, rgba(179,247,117,.09), transparent 42%, rgba(85,215,232,.08));
+  transition: opacity .25s ease;
+}
+
+.memory-file:hover {
+  border-color: rgba(104,193,39,.27);
+  color: #172018;
+  background: rgba(255,255,255,.96);
+  box-shadow: var(--e2), inset 0 1px 0 #fff;
+  will-change: transform;
+}
+
+.memory-file:hover::after { opacity: .55; }
+
+.memory-file.is-selected {
+  z-index: 4;
+  border-color: rgba(119, 213, 46, .74);
+  background: linear-gradient(124deg, rgba(247,255,241,.985), rgba(255,255,255,.965) 55%, rgba(247,253,252,.94));
+  box-shadow:
+    0 0 0 1px rgba(135,224,62,.18),
+    0 0 0 4px rgba(131,228,57,.035),
+    -7px 14px 25px -18px rgba(122,222,56,.38),
+    8px 15px 27px -20px rgba(67,202,223,.34),
+    0 14px 22px -18px rgba(45,64,52,.26),
+    inset 0 1px 0 #fff,
+    inset 0 -1px 0 rgba(100,210,205,.08);
+  will-change: transform;
+}
+
+.memory-file.is-selected::before { opacity: .68; transform: translateY(2px) scale(.92, .76); }
+.memory-file.is-selected::after { opacity: .78; }
+.memory-file:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+.memory-file.is-selected:focus-visible { outline: 0; }
+.memory-file > span { position: relative; z-index: 1; }
+.memory-file > span:nth-child(2) { min-width: 0; display: grid; gap: 3px; }
+.memory-file strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; font-weight: 650; }
+.memory-file small { color: var(--ink-faint); font-size: 8px; }
+
+.file-kind,
+.preview-file-icon {
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-xs);
+  background: rgba(87,140,238,.07);
+}
+
+.file-kind { width: 31px; height: 31px; }
+.file-kind svg { width: 18px; height: 18px; }
+.file-kind.is-xls, .preview-file-icon.is-xls { color: #4bb64c; background: rgba(77,183,80,.09); }
+.file-kind.is-pdf, .preview-file-icon.is-pdf { color: #ef5d57; background: rgba(239,93,87,.08); }
+.file-kind.is-ppt, .preview-file-icon.is-ppt { color: #e8793c; background: rgba(232,121,60,.08); }
+.file-kind.is-doc, .preview-file-icon.is-doc { color: #4b82e8; background: rgba(75,130,232,.08); }
+
+/* 只裁涟漪，不裁卡片本身——卡片的 ::before 柔光要溢出到外面去。
+   必须写成 .memory-file > .memory-ripple-clip：下面的 `.memory-file > span`
+   特异性更高，否则这里的 position: absolute 会被它盖掉，裁切层就变成 grid item 了。 */
+.memory-file > .memory-ripple-clip {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+/* 位置由 JS 按实际点击点设置（left/top + xPercent/yPercent），
+   所以这里只定义外观。用柔和的径向渐变而不是描边圆环——放大 20 倍时
+   边框会被一起缩放成粗线，渐变则始终是一圈化开的水波。 */
+.memory-chip-ripple {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  opacity: 0;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(134, 222, 66, .32), rgba(134, 222, 66, .13) 52%, transparent 70%);
+}
+
+.memory-preview {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-lg);
+  background: linear-gradient(145deg, rgba(255,255,255,.94), rgba(249,252,250,.83));
+  backdrop-filter: blur(26px) saturate(1.08);
+  box-shadow: var(--edge-strong), var(--e3);
+  transform-origin: 50% 36%;
+}
+
+.memory-preview > header {
+  min-height: 70px;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.preview-file-icon { width: 38px; height: 38px; }
+.preview-file-icon svg { width: 23px; height: 23px; }
+.memory-preview > header > span:nth-child(2) { min-width: 0; display: grid; gap: 5px; }
+.memory-preview > header strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #202629; font-size: 12px; }
+.memory-preview > header small { display: flex; align-items: center; gap: 6px; color: var(--leaf-text); font-size: 9px; }
+.memory-preview > header small i { width: 5px; height: 5px; border-radius: 50%; background: #78d92e; }
+
+.preview-meta {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.preview-meta > div { min-width: 0; display: grid; grid-template-columns: 66px minmax(0, 1fr); gap: 8px; }
+.preview-meta dt { color: var(--ink-faint); font-size: 8px; }
+.preview-meta dd { min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-muted); font-size: 8px; }
+
+.preview-summary,
+.preview-table-wrap {
+  padding: 12px 14px 0;
+}
+
+.preview-summary > span,
+.preview-table-wrap > span { color: var(--ink-muted); font-size: 9px; font-weight: 700; }
+.preview-summary p { margin: 8px 0 0; padding: 9px 10px; border-radius: var(--r-sm); color: #687277; background: rgba(241,245,243,.78); font-size: 9px; line-height: 1.65; }
+.preview-table-wrap { min-height: 0; overflow: hidden; }
+.preview-table-wrap table { width: 100%; margin-top: 8px; border-collapse: collapse; table-layout: fixed; color: var(--ink-muted); font-size: 7px; }
+.preview-table-wrap th, .preview-table-wrap td { padding: 6px 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border: 1px solid var(--line); text-align: center; }
+.preview-table-wrap th { color: #566064; background: rgba(242,246,244,.78); font-weight: 700; }
+
+.memory-preview > footer {
+  min-height: 48px;
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 14px;
+  border-top: 1px solid var(--line);
+}
+
+.memory-preview > footer > span { display: flex; align-items: center; gap: 6px; color: var(--leaf-text); font-size: 8px; }
+.memory-preview > footer > span svg { width: 13px; height: 13px; color: #72cf2c; }
+.memory-preview > footer button { display: inline-flex; align-items: center; gap: 5px; padding: 7px 9px; border-radius: var(--r-xs); color: var(--leaf-text); background: rgba(119,207,45,.08); cursor: pointer; font-size: 8px; font-weight: 650; }
+.memory-preview > footer button:hover { color: #34780e; background: rgba(119,207,45,.13); }
+.memory-preview > footer button svg { width: 12px; height: 12px; }
+
+.session-files {
+  min-width: 0;
+  margin-left: -128px;
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  gap: 12px;
+  padding: 11px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: rgba(255,255,255,.62);
+  box-shadow: var(--edge), var(--e1);
+}
+
+.session-files > header { display: flex; align-items: center; align-content: center; flex-wrap: wrap; gap: 7px; color: #637074; }
+.session-files > header svg { width: 16px; height: 16px; }
+.session-files > header strong { color: #455055; font-size: 11px; }
+.session-files > header span { flex-basis: 100%; padding-left: 23px; color: var(--ink-faint); font-size: 8px; }
+.session-files > div { min-width: 0; display: flex; align-items: center; gap: 8px; overflow: hidden; }
+.session-file { min-width: 0; width: min(180px, 30%); height: 54px; display: grid; grid-template-columns: 30px minmax(0, 1fr); align-items: center; gap: 8px; padding: 7px 9px; border: 1px solid var(--line); border-radius: var(--r-sm); color: #647075; background: rgba(249,251,250,.72); }
+.session-file > svg { width: 22px; height: 22px; color: #62b82a; }
+.session-file > span { min-width: 0; display: grid; gap: 3px; }
+.session-file strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #4e585c; font-size: 9px; }
+.session-file small { color: var(--ink-faint); font-size: 8px; }
+.session-add { height: 54px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 16px; border: 1px dashed rgba(74,91,96,.18); border-radius: var(--r-sm); color: var(--ink-faint); background: rgba(255,255,255,.42); cursor: pointer; font-size: 9px; }
+.session-add:hover { color: #4f861f; border-color: rgba(111,196,40,.25); background: rgba(248,253,244,.76); }
+.session-add svg { width: 14px; height: 14px; }
+
+.file-selection-signal {
+  position: absolute;
+  z-index: 12;
+  left: 0;
+  top: 0;
+  width: 10px;
+  height: 10px;
+  display: block;
+  border-radius: 50%;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  background: #f4ffe9;
+  box-shadow: 0 0 0 5px rgba(127,220,45,.12), 0 0 18px rgba(91,205,214,.5);
+  transform: translate(-50%, -50%);
+}
+
+.file-selection-signal i {
+  position: absolute;
+  right: 4px;
+  top: 4px;
+  width: 90px;
+  height: 2px;
+  border-radius: 50%;
+  background: linear-gradient(90deg, transparent, rgba(95,205,216,.35), rgba(222,255,194,.9));
+  filter: blur(.4px);
+}
+
+.file-upload-progress {
+  position: absolute;
+  z-index: 20;
+  right: 16px;
+  top: 80px;
+  width: 310px;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  align-items: center;
+  gap: 11px;
+  padding: 13px;
+  border: 1px solid rgba(118,208,45,.2);
+  border-radius: var(--r-md);
+  background: rgba(252,255,250,.92);
+  backdrop-filter: blur(20px);
+  box-shadow: 0 14px 34px rgba(57,79,50,.09), inset 0 1px 0 #fff;
+}
+
+.file-upload-progress > span { width: 38px; height: 38px; display: grid; place-items: center; border-radius: var(--r-sm); color: #68bb2c; background: rgba(119,207,45,.1); }
+.file-upload-progress > span svg { width: 19px; height: 19px; }
+.file-upload-progress > div { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 7px; }
+.file-upload-progress strong { grid-column: 1 / -1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #45504a; font-size: 10px; }
+.file-upload-progress i { height: 3px; overflow: hidden; border-radius: 999px; background: rgba(83,106,88,.1); }
+/* 索引进度不是一根填充条，而是沿轨道流过去的一道光：底色仍标示进度，
+   上面叠一层导管贴图横向推移。贴图两端已收黑，循环时不会有硬接缝。 */
+.file-upload-progress i b { position: relative; display: block; width: 100%; height: 100%; overflow: hidden; border-radius: inherit; background: linear-gradient(90deg, #78d62f, #73d7ce); transform-origin: 0 50%; }
+.file-upload-progress i b::after {
+  content: "";
+  position: absolute;
+  left: -40%;
+  top: 0;
+  width: 40%;
+  height: 100%;
+  background: url("/assets/energy-conduit-v1.webp") center / 100% 100% no-repeat;
+  animation: conduit-flow 1.15s linear infinite;
+}
+
+@keyframes conduit-flow {
+  to { transform: translateX(350%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .file-upload-progress i b::after { animation: none; opacity: 0; }
+}
+.file-upload-progress small { color: var(--leaf-text); font-size: 8px; }
+
+.files-drag-overlay {
+  position: absolute;
+  z-index: 30;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 9px;
+  border: 1px solid rgba(117,207,43,.32);
+  border-radius: var(--r-xl);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  color: #4b5c4f;
+  background: rgba(249,254,246,.86);
+  backdrop-filter: blur(24px) saturate(1.08);
+  transform: scale(.985);
+  transition: opacity .2s ease, visibility .2s ease, transform .3s var(--ease-premium);
+}
+
+.files-workspace.is-dragging .files-drag-overlay { opacity: 1; visibility: visible; transform: scale(1); }
+.files-drag-overlay > span { width: 48px; height: 48px; display: grid; place-items: center; border-radius: var(--r-md); color: #67ba28; background: rgba(119,207,45,.11); box-shadow: 0 0 30px rgba(120,211,45,.12); }
+.files-drag-overlay > span svg { width: 24px; height: 24px; }
+.files-drag-overlay strong { font-size: 14px; }
+.files-drag-overlay small { color: var(--ink-faint); font-size: 10px; }
+
+.files-empty {
+  grid-row: 1 / -1;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 8px;
+  color: var(--ink-soft);
+}
+.files-empty svg { width: 24px; height: 24px; }
+.files-empty strong { color: #4f595d; font-size: 13px; }
+.files-empty small { font-size: 10px; }
+
+.workspace.is-file-view .companion-halo {
+  opacity: .46;
+  background: radial-gradient(circle at 55% 42%, rgba(255,255,255,.88), rgba(93,211,218,.075) 35%, rgba(128,222,50,.065) 48%, transparent 72%);
+}
+
+.workspace.is-file-view .companion-wrap::after {
+  opacity: .8;
+  background: linear-gradient(100deg, #fbfcfb 2%, rgba(251,252,251,.88) 16%, rgba(251,252,251,.42) 29%, rgba(251,252,251,.08) 40%, transparent 48%);
+}
+
+.composer-dock.is-task-compose.is-file-compose {
+  left: 42px;
+  right: 270px;
+}
+
+.composer-dock {
+  position: absolute;
+  z-index: 8;
+  left: 44px;
+  right: 105px;
+  bottom: var(--composer-bottom);
+  min-height: var(--composer-min-h);
+  overflow: hidden;
+  border: 1px solid var(--glass-line);
+  border-radius: var(--r-md);
+  background: rgba(243, 246, 245, .67);
+  backdrop-filter: blur(28px) saturate(1.08);
+  box-shadow: var(--e2), inset 0 0 0 1px rgba(120, 132, 135, .13), inset 0 1px 0 rgba(255,255,255,.72);
+  /* translate / scale 是独立于 transform 的属性，Flip 拥有 transform，两者叠加。
+     GSAP 接管 transform 时会写内联 `translate: none; scale: none` 来独占变换，
+     这里用 !important 声明这两条通道归收起动作所有——它并不妨碍 GSAP 用 transform。 */
+  /* 收起是"让开"，不是"消失"：位移多给一点，但不透明度只压到 .45——
+     压到 .18 时这块浅色玻璃在浅色工作台上就真的看不见了，加上 pointer-events 也让了出去，
+     用户会以为输入条没了，而唯一的找回方式是把指针挪到画面底部（已踩过一次）。 */
+  translate: 0 calc(var(--dock-collapse, 0) * 46px) !important;
+  scale: calc(1 - var(--dock-collapse, 0) * .015) !important;
+  opacity: calc(1 - var(--dock-collapse, 0) * .55);
+  pointer-events: var(--dock-pointer, auto);
+  transition: box-shadow .35s ease, background .35s ease, --dock-collapse .34s var(--ease-premium);
+  contain: layout paint;
+  will-change: transform;
+}
+
+/* 焦点一旦进入输入条就无条件交还它——包括键盘 Tab 进来、此时它正收着的情况。
+   用 CSS 而不是事件：!important 能盖过 JS 写在内联上的收起量，且照走 transition。 */
+.composer-dock:focus-within {
+  --dock-collapse: 0 !important;
+  --dock-pointer: auto !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .composer-dock {
+    translate: none !important;
+    scale: none !important;
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+.composer-dock.is-task-compose {
+  /* 工具栏单行需要 792px。空间够就保持设计稿的两侧缩进，不够就先收缩缩进
+     争取宽度，再不够才由 .composer-toolbar 的换行兜底——绝不把按钮压成竖排单字。 */
+  left: clamp(64px, calc((100% - 792px) / 2), 286px);
+  right: clamp(64px, calc((100% - 792px) / 2), 286px);
+  bottom: 24px;
+  min-height: 0;
+  --tool-h: 32px;
+  --tool-pad: 10px;
+  --tool-font: 12px;
+  border-color: var(--glass-line);
+  background: linear-gradient(145deg, rgba(249,251,250,.8), rgba(239,244,242,.69));
+  box-shadow: var(--e3), inset 0 1px 0 rgba(255,255,255,.94), inset 0 0 0 1px rgba(78,95,99,.07);
+  backdrop-filter: blur(34px) saturate(1.14);
+}
+
+/* 任务页的输入条是对话里的一根紧凑条，不是首页那种主体输入区：单行起步、
+   控件收一档，整体从 185px 压到约 107px，省下的高度还给正文。 */
+.composer-dock.is-task-compose .composer-input {
+  height: 48px;
+  margin: 9px 10px 0;
+  border-radius: var(--r-sm);
+  border-color: var(--glass-line);
+  background: rgba(255,255,255,.45);
+}
+
+.composer-dock.is-task-compose .composer-input.has-attachments {
+  height: 88px;
+}
+
+.composer-dock.is-task-compose .composer-input textarea {
+  padding: 13px 16px;
+  font-size: 14px;
+}
+
+.composer-dock.is-task-compose .composer-toolbar {
+  min-height: 50px;
+  padding: 5px 12px 10px;
+  gap: 8px 12px;
+}
+
+.composer-dock.is-task-compose .mode-group {
+  width: var(--mode-w, 186px);
+  border-radius: var(--r-sm);
+}
+
+/* 滑块的 left/width 相对 padding 算。高度不要写死——模式组的实际高度由内容撑开，
+   写死就会像现在这样上下不对称（顶 5px、底 11px）。改成上下同时贴 padding。 */
+.composer-dock.is-task-compose .mode-glass,
+.composer-dock.is-task-compose .mode-caustic {
+  top: 4px;
+  bottom: 4px;
+  height: auto;
+}
+
+.composer-dock.is-task-compose .start-button {
+  height: 38px;
+  min-width: var(--start-w, 112px);
+  border-radius: var(--r-sm);
+  font-size: var(--start-font, 13px);
+}
+
+.composer-dock.is-task-compose .input-hint {
+  top: 15px;
+  right: 16px;
+}
+
+/* 文件页：这次提问基于哪几份资料，摆在输入框正上方说清楚，
+   而不是混进"临时附件"里——两者的语义和去向都不一样。 */
+.composer-context {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  margin: 9px 10px 0;
+  padding: 7px 10px;
+  border: 1px solid rgba(112, 190, 44, .2);
+  border-radius: var(--r-sm);
+  background: linear-gradient(140deg, rgba(246, 252, 240, .9), rgba(239, 249, 231, .82));
+}
+
+.composer-context-label {
+  flex: none;
+  padding-left: 2px;
+  color: var(--leaf-text);
+  font-size: 11px;
+  letter-spacing: .04em;
+}
+
+.context-chip {
+  min-width: 0;
+  max-width: 240px;
+  height: 26px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  padding: 0 4px 0 8px;
+  border: 1px solid rgba(97, 168, 40, .24);
+  border-radius: var(--r-xs);
+  background: rgba(255, 255, 255, .9);
+}
+
+.context-chip > svg {
+  width: 13px;
+  height: 13px;
+  color: #4f8f1c;
+}
+
+.context-chip > span {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.context-chip strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #253021;
+  font-size: 11px;
+  font-weight: 620;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.context-chip small {
+  flex: none;
+  color: #7d8a72;
+  font-size: 10px;
+}
+
+.context-chip button {
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-xs);
+  color: #6d7a66;
+  background: transparent;
+  cursor: pointer;
+  transition: color .18s ease, background .18s ease;
+}
+
+.context-chip button:hover {
+  color: #1d2a19;
+  background: rgba(88, 132, 46, .12);
+}
+
+.context-chip button svg { width: 10px; height: 10px; }
+
+/* 选好资料之后最常卡在"该问什么"，给三个起手式；一开始打字就让位。 */
+.composer-suggestions {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 12px -2px;
+}
+
+.composer-suggestions button {
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 11px;
+  border: 1px solid rgba(78, 106, 62, .16);
+  border-radius: 999px;
+  color: #4b5a45;
+  background: rgba(255, 255, 255, .72);
+  cursor: pointer;
+  font-size: 11.5px;
+  white-space: nowrap;
+  transition: color .18s ease, background .18s ease, border-color .18s ease;
+}
+
+.composer-suggestions button svg { width: 12px; height: 12px; color: #6cae2c; }
+
+.composer-suggestions button:hover {
+  color: #1f2a1b;
+  border-color: rgba(101, 173, 43, .38);
+  background: #fff;
+  transform: translateY(-1px);
+}
+
+.composer-suggestions button:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.composer-dock.is-task-compose textarea { color: #202629; }
+.composer-dock.is-task-compose textarea::placeholder { color: #7e898d; }
+.composer-dock.is-task-compose .tool-control,
+.composer-dock.is-task-compose .mode-group button { color: var(--ink-muted); }
+.composer-dock.is-task-compose .tool-control:hover,
+.composer-dock.is-task-compose .tool-control.is-active { color: #202629; background: rgba(255,255,255,.76); }
+.composer-dock.is-task-compose .tool-control.is-active { color: #579d20; }
+.composer-dock.is-task-compose .mode-group {
+  border-color: var(--glass-line-soft);
+  background: rgba(231,237,235,.42);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.52);
+}
+.composer-dock.is-task-compose .mode-glass {
+  border-color: var(--glass-line);
+  background: linear-gradient(145deg, rgba(255,255,255,.94), rgba(248,250,249,.58));
+  box-shadow: 0 7px 16px rgba(51,73,82,.085), inset 0 1px 0 #fff, inset 0 -1px 0 rgba(85,103,108,.08);
+}
+.composer-dock.is-task-compose .mode-group button.is-active { color: #3170de; }
+.composer-dock.is-task-compose .start-button {
+  color: #fff;
+  background: linear-gradient(135deg, #3d83f3, #2466e5);
+  box-shadow: 0 10px 22px rgba(35, 103, 229, .22), inset 0 1px 0 rgba(255,255,255,.28);
+}
+
+.composer-dock.is-file-dragging {
+  background: rgba(244, 250, 242, .82);
+  box-shadow: 0 10px 24px rgba(72, 108, 56, .12), inset 0 0 0 1px rgba(130, 221, 45, .42), inset 0 1px 0 rgba(255,255,255,.9);
+}
+
+/* 从资料库拖来的引用：落点比外部文件上传更"接纳"一些——输入条先展开、
+   边缘转成能力色，内缘浮起一道柔光把落点圈出来。 */
+.composer-dock.is-library-target {
+  --dock-collapse: 0 !important;
+  --dock-pointer: auto !important;
+  border-color: rgba(124, 205, 46, .6);
+  background: linear-gradient(145deg, rgba(250, 254, 245, .95), rgba(241, 250, 234, .89));
+  box-shadow:
+    0 0 0 1px rgba(124, 205, 46, .28),
+    0 20px 48px rgba(78, 128, 44, .17),
+    inset 0 1px 0 rgba(255, 255, 255, .96);
+}
+
+.composer-dock.is-library-target .composer-input {
+  border-color: rgba(124, 205, 46, .46);
+  background: rgba(255, 255, 255, .74);
+}
+
+.composer-dock.is-library-target::after {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  inset: 5px;
+  pointer-events: none;
+  border-radius: var(--r-sm);
+  background: radial-gradient(120% 90% at 50% 118%, rgba(139, 219, 62, .26), rgba(139, 219, 62, .06) 46%, transparent 72%);
+  animation: library-drop-halo .9s var(--ease-premium) infinite alternate;
+}
+
+@keyframes library-drop-halo {
+  from { opacity: .55; }
+  to { opacity: 1; }
+}
+
+/* 被拿起的资料卡留在原位当作占位，避免行内元素塌陷 */
+.memory-file.is-drag-source {
+  opacity: .42;
+  border-style: dashed;
+}
+
+.attachment-chip.is-library {
+  border-color: rgba(97, 168, 40, .28);
+  background: linear-gradient(140deg, rgba(244, 252, 238, .94), rgba(236, 249, 227, .88));
+}
+
+.attachment-chip.is-library svg:first-child {
+  color: #4f8f1c;
+}
+
+.composer-refraction-anchor {
+  position: absolute;
+  z-index: 0;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  opacity: 0;
+  will-change: transform, opacity;
+}
+
+.composer-refraction {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 260px;
+  height: 220px;
+  border-radius: 50%;
+  background:
+    radial-gradient(ellipse, rgba(255,255,255,.72), rgba(156,205,255,.12) 34%, transparent 70%),
+    linear-gradient(120deg, transparent 28%, rgba(255,255,255,.22), transparent 68%);
+  filter: blur(8px);
+  mix-blend-mode: screen;
+  transform: translate3d(-50%, -50%, 0) rotate(-8deg);
+}
+
+.composer-dock::before {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  left: -24%;
+  top: 0;
+  width: 22%;
+  height: 1px;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.95), transparent);
+  transform: translateX(0);
+}
+
+.composer-dock:focus-within {
+  background: rgba(246, 249, 248, .76);
+  box-shadow: 0 6px 8px rgba(54, 65, 69, .1), inset 0 0 0 1px rgba(47, 120, 247, .38), inset 0 1px 0 rgba(255,255,255,.86);
+}
+
+.composer-dock:focus-within::before,
+.workspace.is-running .composer-dock::before {
+  opacity: 1;
+  animation: glass-edge 2.8s var(--ease-premium) infinite;
+}
+
+.composer-dock.has-hint {
+  animation: dock-alert .35s ease;
+}
+
+.composer-input {
+  position: relative;
+  z-index: 2;
+  height: 94px;
+  margin: 13px 15px 0;
+  border: 1px solid var(--glass-line-soft);
+  border-radius: var(--r-sm);
+  background: rgba(255,255,255,.28);
+}
+
+.composer-input.has-attachments textarea {
+  padding-bottom: 47px;
+}
+
+.composer-drop-layer {
+  position: absolute;
+  z-index: 6;
+  inset: 10px;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 5px;
+  border: 1px solid rgba(130, 221, 45, .56);
+  border-radius: var(--r-sm);
+  visibility: hidden;
+  opacity: 0;
+  color: #2c5e16;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255,255,255,.92), transparent 42%),
+    rgba(245, 251, 242, .91);
+  backdrop-filter: blur(24px) saturate(1.14);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.96), inset 0 0 34px rgba(130,221,45,.08);
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+.composer-drop-layer > span {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 2px;
+  border-radius: var(--r-sm);
+  color: #63b422;
+  background: rgba(130,221,45,.12);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.8);
+}
+
+.composer-drop-layer svg {
+  width: 18px;
+  height: 18px;
+}
+
+.composer-drop-layer strong {
+  font-size: 14px;
+}
+
+.composer-drop-layer small {
+  color: #61705f;
+  font-size: 11px;
+}
+
+/* 拖拽变暗走 filter 的 opacity() 而不是 opacity 属性本身：opacity 归首页入场
+   时间轴所有，CSS 再挂一条 .2s 过渡会把 GSAP 每帧写的值又渐变一遍——入场淡入
+   因此被抹开一拍，时间轴结束 clearProps 时还会再触发一次过渡。filter 这条通道
+   本来就在做模糊，把变暗并进去，两边各管一条，视觉结果不变。 */
+.composer-dock.is-file-dragging .composer-input,
+.composer-dock.is-file-dragging .composer-toolbar {
+  filter: blur(2px) opacity(.2);
+  transform: scale(.992);
+}
+
+.composer-input,
+.composer-toolbar {
+  transition: filter .2s ease, transform .26s var(--ease-premium);
+}
+
+.composer-input textarea {
+  width: 100%;
+  height: 100%;
+  resize: none;
+  padding: 24px 26px;
+  border: 0;
+  outline: 0;
+  color: #20262a;
+  background: transparent;
+  font-size: 17px;
+}
+
+.composer-input textarea::placeholder {
+  color: #5d686c;
+}
+
+/* 焦点环归外层玻璃壳，不归 textarea：textarea 铺满容器、自己没有圆角，
+   而容器是 12px 圆角加 1px 描边——直角的 outline 套进圆角壳里，
+   两条线在四个角上怎么都对不齐（`outline-offset: 3px` 还把它推得更靠外）。
+   用 :focus-within 而不是 :has(:focus-visible)——文本输入框无论是点进去还是 Tab 进去
+   都该有可见的焦点指示，而 :focus-visible 在脚本聚焦时不命中，两条路的表现会不一致。 */
+.composer-input textarea:focus-visible {
+  outline: none;
+}
+
+.composer-input:focus-within {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.input-hint {
+  position: absolute;
+  right: 20px;
+  top: 24px;
+  color: #d75148;
+  font-size: 12px;
+}
+
+.attachment-tray {
+  position: absolute;
+  z-index: 3;
+  left: 20px;
+  right: 20px;
+  bottom: 8px;
+  display: flex;
+  gap: 6px;
+  overflow: hidden;
+  pointer-events: auto;
+}
+
+.attachment-chip {
+  min-width: 0;
+  max-width: 210px;
+  height: 30px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  padding: 0 6px 0 9px;
+  border: 1px solid rgba(79, 110, 68, .12);
+  border-radius: var(--r-xs);
+  color: #29322b;
+  background: rgba(248, 252, 247, .84);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.88), 0 3px 9px rgba(49,65,48,.055);
+  backdrop-filter: blur(12px);
+  will-change: transform, opacity;
+}
+
+.attachment-chip > svg {
+  width: 14px;
+  height: 14px;
+  color: #66b923;
+}
+
+.attachment-chip > span {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.attachment-chip strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.attachment-chip small {
+  flex: none;
+  color: #77817a;
+  font-size: 9px;
+}
+
+.attachment-chip button {
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-radius: var(--r-xs);
+  color: #6f7972;
+  background: transparent;
+  cursor: pointer;
+}
+
+.attachment-chip button:hover {
+  color: #243027;
+  background: rgba(41, 54, 45, .07);
+}
+
+.attachment-chip button svg {
+  width: 11px;
+  height: 11px;
+}
+
+.composer-toolbar {
+  position: relative;
+  z-index: 2;
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 20px;
+  padding: 7px 24px 17px;
+}
+
+.tool-group,
+.mode-group {
+  display: flex;
+  align-items: center;
+  flex: none;
+}
+
+.tool-group {
+  gap: 4px;
+}
+
+.tool-control,
+.mode-group button {
+  height: var(--tool-h, 42px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 var(--tool-pad, 13px);
+  border-radius: var(--r-sm);
+  color: #4e575b;
+  background: transparent;
+  cursor: pointer;
+  font-size: var(--tool-font, 13px);
+  white-space: nowrap;
+  transition: color .2s ease, background .2s ease;
+}
+
+.tool-control:hover,
+.tool-control.is-active,
+.mode-group button:hover,
+.mode-group button.is-active {
+  color: #171c1f;
+  background: rgba(255,255,255,.75);
+}
+
+.tool-control.is-active {
+  color: #3f7f10;
+}
+
+.tool-control:active,
+.side-rail nav button:active,
+.tool-control:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+.attachment-count {
+  min-width: 17px;
+  height: 17px;
+  display: inline-grid;
+  place-items: center;
+  padding-inline: 4px;
+  border-radius: var(--r-xs);
+  color: #397410;
+  background: rgba(130,221,45,.14);
+  font-size: 9px;
+  font-weight: 750;
+}
+
+.tool-control svg,
+.mode-group svg {
+  width: 18px;
+  height: 18px;
+}
+
+.mode-group {
+  position: relative;
+  isolation: isolate;
+  width: 240px;
+  margin-left: auto;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 4px;
+  overflow: hidden;
+  border: 1px solid var(--glass-line-soft);
+  border-radius: var(--r-md);
+  background: rgba(235, 240, 238, .34);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.46);
+  cursor: grab;
+  touch-action: pan-y;
+  user-select: none;
+}
+
+.mode-glass {
+  position: absolute;
+  z-index: 0;
+  left: 4px;
+  top: 4px;
+  width: calc((100% - 8px) / 3);
+  height: 38px;
+  border: 1px solid var(--glass-line);
+  border-radius: var(--r-sm);
+  background:
+    linear-gradient(145deg, rgba(255,255,255,.92), rgba(255,255,255,.48)),
+    rgba(246, 249, 248, .58);
+  backdrop-filter: blur(18px) saturate(1.25);
+  box-shadow: 0 4px 8px rgba(51, 81, 100, .08), inset 0 1px 0 rgba(255,255,255,.96), inset 0 -1px 0 rgba(111,131,137,.08);
+  transform-origin: 50% 50%;
+  will-change: transform;
+}
+
+.mode-group[data-active="auto"] { --mode-tint: rgba(214, 255, 176, .9); }
+.mode-group[data-active="quick"] { --mode-tint: rgba(255, 226, 168, .9); }
+.mode-group[data-active="deep"] { --mode-tint: rgba(190, 208, 255, .9); }
+
+.mode-caustic {
+  position: absolute;
+  z-index: 1;
+  left: 4px;
+  top: 4px;
+  width: calc((100% - 8px) / 3);
+  height: 38px;
+  border-radius: var(--r-sm);
+  pointer-events: none;
+  opacity: .56;
+  /* 焦散是一张纯白贴图当遮罩、底下垫模式色——一张顶三张，换色只换 background。
+     原先是渐变 + blur(.2px)，那点模糊视觉上等于没有，却要走一遍滤镜。 */
+  background: var(--mode-tint, rgba(255,255,255,.82));
+  -webkit-mask: url("/assets/caustic-sheet-v1.webp") center / 100% 100% no-repeat;
+  mask: url("/assets/caustic-sheet-v1.webp") center / 100% 100% no-repeat;
+  transform-origin: 50% 50%;
+  will-change: transform;
+}
+
+.mode-group[data-dragging="true"] {
+  cursor: grabbing;
+}
+
+.mode-group[data-dragging="true"] .mode-glass {
+  box-shadow: 0 5px 8px rgba(51, 81, 100, .11), inset 0 1px 0 rgba(255,255,255,1), inset 0 -1px 0 rgba(111,131,137,.08);
+}
+
+.mode-group[data-dragging="true"] .mode-caustic {
+  opacity: .94;
+}
+
+.mode-group[data-dragging="true"] button {
+  pointer-events: none;
+}
+
+.mode-group button {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: 38px;
+  justify-content: center;
+  padding-inline: 8px;
+  background: transparent;
+}
+
+.mode-group button.is-active {
+  color: #1f63d5;
+  background: transparent;
+  box-shadow: none;
+}
+
+.mode-group button.is-active svg {
+  filter: drop-shadow(0 1px 2px rgba(31,99,213,.2));
+}
+
+.mode-group[data-dragging="true"] button.is-active {
+  color: #4e575b;
+}
+
+.mode-group[data-preview="auto"] button[data-mode="auto"],
+.mode-group[data-preview="quick"] button[data-mode="quick"],
+.mode-group[data-preview="deep"] button[data-mode="deep"] {
+  color: #1f63d5;
+  transform: translateY(-1px);
+}
+
+.mode-group button:focus-visible {
+  outline: none;
+}
+
+.mode-group:has(button:focus-visible) {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+
+.start-button {
+  --button-x: 50%;
+  --button-y: 50%;
+  position: relative;
+  overflow: hidden;
+  flex: none;
+  height: 52px;
+  min-width: 166px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 0 18px;
+  white-space: nowrap;
+  border-radius: var(--r-md);
+  color: #fff;
+  background: var(--blue);
+  box-shadow: var(--e-accent);
+  cursor: pointer;
+  font-weight: 660;
+  transition: box-shadow .2s ease, background .2s ease;
+  transform-origin: 50% 68%;
+  will-change: transform;
+}
+
+.start-button:hover {
+  background: #1d61d5;
+  box-shadow: var(--e-accent-hover);
+}
+
+.start-button:disabled {
+  cursor: progress;
+  color: rgba(255,255,255,.82);
+  background: #4f7fca;
+  box-shadow: none;
+}
+
+/* 执行中主按钮不再是 disabled，而是唯一的出口：换成中性的静音蓝，
+   跟"可以开始"的品牌蓝区分开，但不用警示色——停止是正常操作，不是错误。 */
+.start-button.is-stoppable {
+  color: rgba(255,255,255,.9);
+  background: #55708f;
+  box-shadow: none;
+}
+
+.start-button.is-stoppable:hover {
+  background: #61809f;
+  box-shadow: none;
+}
+
+/* 执行中那个方块要有心跳，否则跟"已停下"看着一样 */
+.start-button.is-stoppable svg:first-child {
+  animation: stoppable-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes stoppable-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .5; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .start-button.is-stoppable svg:first-child { animation: none; }
+}
+
+.start-button::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(circle 76px at var(--button-x) var(--button-y), rgba(255,255,255,.34), rgba(255,255,255,.08) 44%, transparent 72%);
+  transform: none;
+  transition: opacity .22s ease;
+}
+
+.start-button:hover::before {
+  opacity: 1;
+}
+
+.start-button svg {
+  width: 18px;
+}
+
+.start-button svg:last-child {
+  width: 15px;
+  opacity: .62;
+}
+
+.start-button:disabled svg:first-child {
+  animation: execute-spin 1.4s linear infinite;
+}
+
+button:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+
+/* 选中、光标、原生控件都跟着品牌蓝走。默认的系统蓝在这套偏冷的墨绿玻璃里
+   是唯一一处"别人家的颜色"，一选中文字就露馅。 */
+::selection {
+  color: var(--ink);
+  background: rgba(35, 109, 233, .18);
+}
+
+.composer-input textarea,
+.files-search input {
+  caret-color: var(--blue);
+}
+
+.app-frame {
+  accent-color: var(--blue);
+}
+
+/* 会变化的数字用等宽数形：计数、序号、文件大小刷新时，同一行的字不会跟着左右抖。 */
+.memory-file small,
+.source-rail > header small,
+.source-list em,
+.execution-step > span,
+.task-live,
+.file-upload-progress {
+  font-variant-numeric: tabular-nums;
+}
+
+/* 正文按语义换行，避免最后一行只剩一两个字的孤字。 */
+.answer-intro,
+.answer-copy p span,
+.memory-preview > footer > span,
+.capability-card span {
+  text-wrap: pretty;
+}
+
+.result-peek {
+  position: absolute;
+  z-index: 9;
+  left: 44px;
+  bottom: 282px;
+  width: min(560px, calc(100% - 220px));
+  min-height: 72px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 13px;
+  padding: 13px 14px;
+  border: 1px solid rgba(94, 139, 74, .2);
+  border-radius: var(--r-md);
+  color: #172019;
+  background: rgba(244, 251, 241, .9);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 5px 8px rgba(50, 70, 48, .08);
+  animation: result-reveal .42s var(--ease-premium) both;
+}
+
+/* 三片晶面从中心向外展开，合拢的同一拍正文落位。三片取自同一张贴图的三段，
+   靠 background-position 切开，只补间 transform + opacity。 */
+.result-facet {
+  position: absolute;
+  top: 50%;
+  width: 132px;
+  height: 88px;
+  display: block;
+  pointer-events: none;
+  opacity: 0;
+  background-image: url("/assets/crystal-facet-v1.webp");
+  background-repeat: no-repeat;
+  background-size: 300% 100%;
+  transform: translateY(-50%);
+}
+
+.result-facet.facet-1 { left: 6%; background-position: 0 50%; animation: facet-open .5s var(--ease-premium) .04s both; }
+.result-facet.facet-2 { left: 42%; width: 96px; background-position: 50% 50%; animation: facet-open .5s var(--ease-premium) .1s both; }
+.result-facet.facet-3 { left: 72%; background-position: 100% 50%; animation: facet-open .5s var(--ease-premium) .16s both; }
+
+/* 从中心展开、亮一下再收成底纹。只动 transform + opacity。 */
+@keyframes facet-open {
+  from { opacity: 0; transform: translateY(-50%) scale(.42); }
+  55% { opacity: .52; }
+  to { opacity: .2; transform: translateY(-50%) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .result-facet { animation: none; opacity: .2; }
+}
+
+.result-peek > svg {
+  width: 28px;
+  height: 28px;
+  color: #66b923;
+}
+
+.result-peek > span {
+  display: grid;
+  gap: 3px;
+}
+
+.result-peek strong {
+  font-size: 14px;
+}
+
+.result-peek small {
+  color: #4f5c52;
+  font-size: 12px;
+}
+
+.result-peek button {
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 13px;
+  border-radius: var(--r-sm);
+  color: #245f16;
+  background: rgba(130,221,45,.12);
+  cursor: pointer;
+  font-weight: 650;
+}
+
+.result-peek button:hover {
+  background: rgba(130,221,45,.2);
+}
+
+.result-peek button:active {
+  transform: scale(.98);
+}
+
+.result-peek button svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* 工具开关的信号点与落点绽放。两层都常驻但透明，由 GSAP 一次性驱动；
+   不加 will-change——它们只在开关那 0.5 秒里动，补间期间浏览器会自己提升。 */
+/* 打字蓄能的导轨。贴在输入条左缘，亮度跟着字数走；
+   --charge 注册成数值才能被浏览器连续插值，不然到阈值才整块跳。 */
+.composer-charge-rail {
+  position: absolute;
+  z-index: 4;
+  left: 6px;
+  top: 14px;
+  bottom: 14px;
+  width: 5px;
+  display: block;
+  pointer-events: none;
+  opacity: calc(var(--charge, 0) * .9);
+  background: url("/assets/composer-charge-rail-v1.webp") center bottom / 100% 100% no-repeat;
+  transform: scaleY(calc(.25 + var(--charge, 0) * .75));
+  transform-origin: 50% 100%;
+}
+
+/* 每落一个词在光标处推一次的横向光晕 */
+.composer-word-pulse {
+  position: absolute;
+  z-index: 4;
+  left: 0;
+  top: 0;
+  width: 46px;
+  height: 3px;
+  display: block;
+  pointer-events: none;
+  opacity: 0;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, rgba(139, 219, 62, .85), transparent);
+}
+
+/* 继续追问的弧线光迹。没装 MotionPath，弧线由 x/y 两轴不同缓动合出来。 */
+/* 提交时的脉络回声。跟开场的点火层同构（同一张脉络贴图 + 同一张测地流场 +
+   同一个亮度→alpha 滤镜），区别只在生命周期：开场只在首次进入播一次，
+   回声每次提交都要放，所以它常驻挂载。静息时 visibility: hidden，不占合成层。 */
+/* display: none 而不是 visibility: hidden——后者挡不住 Overlap 提升，实测静息时
+   它仍被合成成一个 1800x1632 / 11.2MB 的层。display 由时间轴在两端显式切换。 */
+.companion-echo {
+  z-index: 4;
+  display: none;
+}
+
+/* 模式的语义回声：深度想得慢、呼吸也慢一档并更饱和；快速反过来。
+   属性写在 .core-anchor 上——它下面只有核心点和冲击环两个节点，
+   写到 .workspace 上会让整棵子树在每次换模式时重算样式。 */
+.core-anchor[data-mode="deep"] .core-signal { animation-duration: 4.6s; background: #ff4034; }
+.core-anchor[data-mode="quick"] .core-signal { animation-duration: 2.1s; }
+
+/* 记忆检索环。只在文件页搜索被激活时浮出，离焦即停——不是常驻装饰。
+   跟点火/回声/停摆同一套构造，纹理是头部的仪器环。 */
+/* 它不能挂在 .companion-wrap 里：伴生体在文件页是 z-2、压到 opacity .5、
+   整个躲在内容面板后面的，实测头部落点 (1210,183) 正好被详情面板盖住——
+   环画得再对也一个像素看不见。所以做成工作区级的覆盖层（z-6，在面板之上、
+   输入条之下），几何由 JS 按实测的人物盒子落位，不跟着伴生体一起被压暗。 */
+.companion-scan-ring {
+  position: absolute;
+  z-index: 6;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  display: block;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  background: url("/assets/companion-scan-ring-v1.webp") center top / contain no-repeat;
+  filter: url("#ignite-luma-alpha");
+}
+
+.workspace.is-memory-searching .companion-scan-ring {
+  opacity: .8;
+  visibility: visible;
+}
+
+/* 扫描扇面单独转，外层的几何归 JS。整层一起转的话，环的中心
+   不在元素中心上，转起来会绕着画布中心画大圈。 */
+.companion-scan-ring > i {
+  position: absolute;
+  inset: 0;
+  display: block;
+  background: inherit;
+}
+
+.workspace.is-memory-searching .companion-scan-ring > i {
+  animation: scan-ring-sweep 3.4s linear infinite;
+}
+
+/* 只转不缩不闪：环是仪器，仪器该匀速走。 */
+@keyframes scan-ring-sweep {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workspace.is-memory-searching .companion-scan-ring > i { animation: none; }
+}
+
+/* 停摆态脉络。用的是同一张测地流场当闸门，但纹理换成冷掉的那张：
+   停止执行时它先整片浮出（冷灰蓝、核心是一圈将熄的暗红），再把覆盖从末梢
+   往核心收回去——读起来是残余电流耗散完，而不是"又亮了一次"。 */
+.companion-halt {
+  z-index: 4;
+  display: none;
+}
+
+.halt-texture {
+  background-image: url("/assets/companion-halt-map-v1.webp");
+}
+
+/* 停摆之后核心不再呼吸，转成一颗压暗的红点 */
+.companion-wrap.is-halted .core-signal {
+  background: #8f3b34;
+  box-shadow: 0 0 0 0 rgba(143, 59, 52, .2), 0 0 10px rgba(143, 59, 52, .5);
+  animation: none;
+}
+
+/* 核心接住信号时推出去的那一圈。只补间 transform + opacity。 */
+.core-shock {
+  position: absolute;
+  z-index: 3;
+  left: 43.2%;
+  top: 56.5%;
+  width: 26px;
+  height: 26px;
+  margin: -13px 0 0 -13px;
+  display: block;
+  pointer-events: none;
+  opacity: 0;
+  border: 1px solid rgba(255, 122, 112, .9);
+  border-radius: 50%;
+  box-shadow: 0 0 14px rgba(255, 122, 112, .5);
+}
+
+.followup-trace {
+  position: absolute;
+  z-index: 11;
+  right: 190px;
+  bottom: 154px;
+  width: 7px;
+  height: 7px;
+  display: block;
+  pointer-events: none;
+  opacity: 0;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 0 4px rgba(124, 205, 51, .14), 0 0 18px rgba(124, 205, 51, .6);
+  transform: translate3d(0, 0, 0);
+}
+
+/* 光迹落到输入框时亮一圈。只补间 transform + opacity，边框是常驻的。 */
+.composer-arrival-ring {
+  position: absolute;
+  inset: -1px;
+  z-index: 3;
+  display: block;
+  pointer-events: none;
+  opacity: 0;
+  border: 1px solid rgba(124, 205, 51, .78);
+  border-radius: inherit;
+}
+
+.tool-signal {
+  position: absolute;
+  z-index: 10;
+  right: 190px;
+  bottom: 154px;
+  width: 0;
+  height: 0;
+  display: block;
+  pointer-events: none;
+}
+
+.tool-signal-dot,
+.tool-signal-bloom {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+  opacity: 0;
+  border-radius: 50%;
+  transform: translate3d(0, 0, 0);
+}
+
+.tool-signal-dot {
+  width: 8px;
+  height: 8px;
+  margin: -4px 0 0 -4px;
+  background: #fff;
+  box-shadow: 0 0 0 4px rgba(124, 205, 51, .16), 0 0 16px rgba(124, 205, 51, .62);
+}
+
+.tool-signal-bloom {
+  width: 78px;
+  height: 78px;
+  margin: -39px 0 0 -39px;
+  background: radial-gradient(circle, rgba(233, 255, 214, .82) 0 16%, rgba(139, 219, 62, .34) 42%, transparent 72%);
+}
+
+/* 附件 chip 溃散时当场造、播完就删的三颗光点 */
+.chip-mote {
+  position: absolute;
+  z-index: 3;
+  width: 4px;
+  height: 4px;
+  display: block;
+  pointer-events: none;
+  opacity: 0;
+  border-radius: 50%;
+  background: rgba(124, 205, 51, .9);
+  box-shadow: 0 0 8px rgba(124, 205, 51, .6);
+}
+
+/* 快捷提问飞进输入框的那份克隆体。只活 .3 秒，样式只求认得出是同一段文案。 */
+.quick-prompt-ghost {
+  position: absolute;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 10px;
+  pointer-events: none;
+  border-radius: var(--r-xs);
+  color: var(--leaf-text);
+  background: rgba(244, 252, 238, .92);
+  box-shadow: var(--e1);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.signal-transfer {
+  position: absolute;
+  z-index: 10;
+  right: 190px;
+  bottom: 154px;
+  width: 9px;
+  height: 9px;
+  pointer-events: none;
+  border-radius: 50%;
+  opacity: 0;
+  background: #fff;
+  box-shadow: 0 0 0 5px rgba(35,109,233,.12), 0 0 20px rgba(35,109,233,.58), 14px 16px 22px rgba(35,109,233,.24);
+  transform: translate3d(0, 0, 0) scale(.65);
+}
+
+@keyframes companion-breathe {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(-4px, -4px, 0) scale(1.006); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .companion-intro-layer {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+  }
+}
+
+@keyframes task-step-pulse {
+  0%, 100% { opacity: 0; transform: scale(.9); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes companion-scan {
+  0% { transform: translate3d(0, -34%, 0) scaleX(.86); opacity: 0; }
+  18% { opacity: .72; }
+  82% { opacity: .72; }
+  100% { transform: translate3d(0, 620%, 0) scaleX(1.08); opacity: 0; }
+}
+
+@keyframes core-idle {
+  0%, 100% { transform: translate(-50%, -50%) scale(.92); opacity: .68; }
+  50% { transform: translate(-50%, -50%) scale(1.16); opacity: 1; }
+}
+
+@keyframes core-running {
+  0%, 100% { transform: translate(-50%, -50%) scale(.9); box-shadow: 0 0 0 0 rgba(255,90,80,.3), 0 0 14px rgba(255,90,80,.58); }
+  50% { transform: translate(-50%, -50%) scale(1.15); box-shadow: 0 0 0 10px rgba(255,90,80,0), 0 0 24px rgba(255,90,80,.72); }
+}
+
+@keyframes core-finished {
+  from { transform: translate(-50%, -50%) scale(.72); opacity: .25; }
+  to { transform: translate(-50%, -50%) scale(1.15); opacity: 1; }
+}
+
+@keyframes node-scan {
+  0% { transform: scale(.6); opacity: .8; }
+  70%, 100% { transform: scale(1.4); opacity: 0; }
+}
+
+@keyframes node-finish {
+  from { transform: scale(.7); opacity: .8; }
+  to { transform: scale(1.65); opacity: 0; }
+}
+
+@keyframes status-wave {
+  from { transform: scaleY(.45); }
+  to { transform: scaleY(2.8); }
+}
+
+@keyframes glass-edge {
+  0% { transform: translateX(0); opacity: 0; }
+  20% { opacity: .9; }
+  72% { opacity: .9; }
+  100% { transform: translateX(650%); opacity: 0; }
+}
+
+@keyframes execute-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* 去掉了原先的 filter: blur(5px)——那是每帧一次全卡重绘。"结晶"的质感现在
+   由三片晶面承担，卡片本身只走 transform + opacity。 */
+@keyframes result-reveal {
+  from { opacity: 0; transform: translateY(10px) scale(.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* visibility: hidden 只是不绘制，关键帧照样每帧驱动一次样式重算——首页那几层
+   在任务页/文件页是藏着的，却一直在跑。实测一条执行链路里，藏在首页里的 4 根
+   状态波纹单独贡献了 2172 次样式失效。离开首页就停，回来自然继续。 */
+.workspace.is-task-view .ambient-status.is-running .status-wave b,
+.workspace.is-task-view .companion-node.is-current i::after,
+.workspace.is-task-view .companion-nodes:not(.is-running):not(.is-finished):not(.settings-anchors) .node-1 i::after {
+  animation-play-state: paused;
+}
+
+@keyframes dock-alert {
+  0%, 100% { transform: translateX(0); }
+  33% { transform: translateX(-5px); }
+  66% { transform: translateX(5px); }
+}
+
+/* 笔记本屏（视口高度不足以铺开设计稿的 1058px）下收一档能力卡的高度，
+   让标题、能力区、输入条三者始终有呼吸空间而不是勉强贴合。 */
+@media (max-height: 860px) {
+  .capability-card {
+    min-height: 108px;
+  }
+}
+
+@media (max-width: 1180px) {
+  .app-frame {
+    grid-template-columns: 98px minmax(0, 1fr);
+  }
+
+  .side-rail {
+    padding-inline: 8px;
+  }
+
+  .side-rail nav button {
+    width: 72px;
+  }
+
+  .nav-glass { width: 72px; }
+
+  .companion-wrap {
+    right: -180px;
+    opacity: .78;
+  }
+
+  .ambient-status,
+  .companion-nodes {
+    display: none;
+  }
+
+  .composer-toolbar {
+    gap: 8px;
+  }
+
+  .tool-control {
+    padding-inline: 8px;
+  }
+
+  .attachment-count {
+    display: none;
+  }
+
+  .attachment-chip {
+    max-width: 150px;
+  }
+
+  .result-peek {
+    width: min(520px, calc(100% - 150px));
+  }
+
+  .task-workspace {
+    inset-inline: 18px;
+    grid-template-columns: 190px minmax(390px, 1fr) 210px;
+    gap: 14px;
+  }
+
+  .files-workspace {
+    inset-inline: 110px 18px;
+  }
+
+  .memory-stage {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+
+  .memory-preview { display: none; }
+  .memory-orbits { width: 100%; margin-left: 0; }
+  .session-files { margin-left: 0; }
+
+  .memory-orbit {
+    grid-template-columns: 116px minmax(0, 1fr);
+    padding-inline: 14px;
+  }
+
+  .memory-file {
+    padding-inline: 6px;
+  }
+
+  .composer-dock.is-task-compose { left: 140px; right: 24px; }
+  .composer-dock.is-task-compose.is-file-compose { left: 30px; right: 24px; }
+
+  /* 第三列继续保留：正文一旦铺到右边就会压在伴生体身上，浅色态没有 backdrop-filter
+     兜底，人形会直接透过没有卡片背景的偏好行。 */
+  .settings-workspace {
+    inset-inline: 42px 28px;
+    grid-template-columns: 132px minmax(0, 1fr) minmax(72px, 216px);
+    column-gap: 44px;
+  }
+
+  /* 这一档 .companion-nodes 已整体隐藏（和首页节点同一条规则），不必再写位置。 */
+  .settings-segmented { width: 226px; }
+
+}
+
+/* 首页输入条在这一档已经放不下带文字的工具按钮。与其让它换行把输入条撑高、
+   反过来挤压上方的能力区，不如提前降级成纯图标——和移动端是同一套语言。 */
+@media (max-width: 1080px) {
+  .composer-dock {
+    --mode-w: 200px;
+  }
+
+  /* 直接属性而不是改变量：变量的层叠同样吃特异性，
+     .composer-dock.is-task-compose 上的声明会盖过这里的媒体查询。 */
+  .tool-control {
+    width: 38px;
+    padding: 0;
+    justify-content: center;
+    font-size: 0;
+  }
+
+  .mode-group {
+    width: 200px;
+  }
+}
+
+/* 视口不够高时收紧首页的上边距与段间距，让能力区始终落在输入条上方。 */
+@media (max-height: 800px) {
+  .home-view {
+    padding-top: clamp(64px, 11vh, 96px);
+    gap: clamp(20px, 4vh, 40px);
+  }
+}
+
+@media (hover: hover) {
+  .side-rail nav:has(button:hover) button:not(:hover):not(.is-active) {
+    opacity: .62;
+    transform: scale(.97);
+  }
+
+  .side-rail nav button:hover:not(.is-active) {
+    transform: translateY(-3px) scale(1.035);
+  }
+
+  .side-rail nav button.is-active:hover {
+    transform: none;
+  }
+}
+
+@media (max-width: 820px) {
+  .prototype-stage {
+    padding: 0;
+  }
+
+  .app-frame {
+    width: 100vw;
+    height: 100dvh;
+    min-height: 680px;
+    grid-template-columns: 1fr;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .side-rail {
+    position: absolute;
+    z-index: 20;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 72px;
+    display: block;
+    padding: 5px 12px;
+    border-top: 1px solid var(--line-strong);
+    border-right: 0;
+  }
+
+  .side-brand {
+    display: none;
+  }
+
+  .workspace {
+    --composer-bottom: 86px;
+    --composer-min-h: 186px;
+  }
+
+  .home-view {
+    justify-content: flex-start;
+    gap: clamp(18px, 3.5vh, 40px);
+    padding: 118px 20px calc(var(--composer-reserve) + 22px);
+  }
+
+  .side-rail nav {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: 1fr;
+    padding: 0;
+  }
+
+  .nav-glass {
+    left: 0;
+    top: 0;
+    width: 25%;
+    height: 62px;
+    border-radius: var(--r-md);
+  }
+
+  .nav-glass::after {
+    left: 50%;
+    top: 0;
+    width: 28px;
+    height: 3px;
+    transform: translateX(-50%);
+  }
+
+  .side-rail nav button,
+  .side-rail nav button:nth-of-type(4) {
+    width: 100%;
+    height: 62px;
+    grid-row: 1;
+    gap: 3px;
+  }
+
+  .side-rail nav button.is-active::before {
+    left: 50%;
+    top: -5px;
+    width: 28px;
+    height: 3px;
+    transform: translateX(-50%);
+  }
+
+  .side-rail nav svg {
+    width: 23px;
+    height: 23px;
+  }
+
+  .side-rail nav span {
+    font-size: 11px;
+  }
+
+  .workspace-brand {
+    left: 20px;
+    top: 20px;
+  }
+
+  .hero-copy {
+    max-width: calc(100vw - 40px);
+  }
+
+  .hero-copy h1 {
+    max-width: calc(100vw - 40px);
+    font-size: clamp(32px, 9vw, 36px);
+    letter-spacing: -.03em;
+    white-space: nowrap;
+  }
+
+  .hero-copy p {
+    max-width: 270px;
+    font-size: 14px;
+  }
+
+  .companion-wrap {
+    width: 108vw;
+    height: 72%;
+    right: -48vw;
+    top: 70px;
+    opacity: .55;
+  }
+
+  .signal-transfer {
+    display: none;
+  }
+
+  .capability-list {
+    width: 276px;
+  }
+
+  .capability-card {
+    width: 92px;
+    min-height: 105px;
+    padding: 12px 10px;
+  }
+
+  .capability-list small {
+    display: none;
+  }
+
+  .composer-dock {
+    left: 14px;
+    right: 14px;
+    bottom: 86px;
+  }
+
+  .task-workspace {
+    inset: 88px 14px calc(var(--composer-actual-h, 122px) + 98px);
+    display: block;
+  }
+
+  .files-workspace {
+    inset: 82px 14px calc(var(--composer-actual-h, 122px) + 98px);
+    grid-template-rows: 52px minmax(0, 1fr);
+  }
+
+  .settings-workspace {
+    inset: 72px 16px 82px;
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: 68px auto minmax(0, 1fr);
+    column-gap: 0;
+  }
+
+  .settings-header { grid-column: 1; grid-row: 1; padding-bottom: 12px; }
+  .settings-header h1 { font-size: 24px; }
+  .settings-categories {
+    grid-column: 1;
+    grid-row: 2;
+    flex-direction: row;
+    overflow-x: auto;
+    padding: 10px 0;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+    scrollbar-width: none;
+  }
+  .settings-categories::-webkit-scrollbar { display: none; }
+  .settings-categories > button { width: auto; min-width: max-content; min-height: 34px; padding-inline: 11px; }
+  /* 横排时那条 3px 竖条落不到位，玻璃块本身已经足够指认当前项。 */
+  .settings-rail-glass::after { display: none; }
+  .settings-account { display: none; }
+  .settings-content { grid-column: 1; grid-row: 3; padding-top: 15px; }
+  .settings-row { min-height: 68px; gap: 12px; }
+  .settings-row small { max-width: 180px; }
+  .settings-segmented { width: 198px; }
+  .settings-segmented button { padding-inline: 4px; font-size: 10px; }
+  .settings-segmented button svg { width: 12px; height: 12px; }
+  .workspace.is-settings-view .companion-wrap,
+  .settings-anchors { display: none; }
+
+  .files-head {
+    gap: 10px;
+  }
+
+  .files-search { flex: 1 1 auto; height: 38px; }
+  .files-privacy { display: none; }
+  .files-upload-button { height: 40px; padding-inline: 13px; font-size: 11px; }
+
+  .memory-stage { display: block; }
+  .memory-orbits { height: 100%; }
+  .memory-preview,
+  .session-files { display: none; }
+  .memory-orbit { grid-template-columns: 104px minmax(0, 1fr); padding-inline: 10px; border-radius: var(--r-xl); }
+  .memory-orbit::before { display: none; }
+  .memory-file-row { grid-template-columns: repeat(3, minmax(132px, 1fr)); overflow-x: auto; scrollbar-width: none; }
+  .memory-file-row::-webkit-scrollbar { display: none; }
+  .file-upload-progress { left: 12px; right: 12px; top: 92px; width: auto; }
+
+  .task-history,
+  .source-rail { display: none; }
+
+  .task-thread { height: 100%; }
+  .task-thread-head { min-height: 68px; }
+  .task-thread-head h1 { font-size: 22px; }
+  .task-live { padding: 8px; font-size: 0; }
+  .execution-trace { padding-inline: 8px; }
+  .execution-step > div { display: none; }
+  .answer-card { padding-inline: 16px; }
+
+  .composer-dock.is-task-compose {
+    left: 14px;
+    right: 14px;
+    bottom: 86px;
+    min-height: 0;
+  }
+
+  .composer-dock.is-task-compose.is-file-compose {
+    left: 14px;
+    right: 14px;
+  }
+
+  .workspace.is-task-view .companion-wrap {
+    width: 118vw;
+    right: -53vw;
+    opacity: .38;
+  }
+
+  .result-peek {
+    left: 14px;
+    right: 14px;
+    bottom: 278px;
+    width: auto;
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .result-peek button {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .composer-toolbar {
+    padding-inline: 14px;
+  }
+
+  .tool-control {
+    width: 38px;
+    padding: 0;
+    justify-content: center;
+    font-size: 0;
+  }
+
+  .mode-group button {
+    padding: 0;
+    font-size: 0;
+  }
+
+  .composer-dock {
+    /* 375px 宽下工具栏单行只有约 323px 可用，模式组再收一档才留得出余量 */
+    --mode-w: 112px;
+    --start-w: 52px;
+  }
+
+  .mode-group {
+    width: 124px;
+  }
+
+  .start-button {
+    min-width: 52px;
+    width: 52px;
+    padding: 0;
+  }
+
+  .start-button span,
+  .start-button svg:last-child {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .side-rail,
+  .ambient-status,
+  .capability-list,
+  .companion-node em,
+  .composer-dock,
+  .result-peek,
+  .composer-drop-layer,
+  .attachment-chip {
+    backdrop-filter: none;
+  }
+
+  .composer-dock {
+    background: rgba(244, 247, 246, .98);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+    transition-delay: 0s !important;
+    animation-delay: 0s !important;
+  }
+
+  .companion-wrap {
+    transform: none !important;
+  }
+
+  .companion-semantic-layer {
+    transform: none !important;
+  }
+
+  .task-form-region,
+  .memory-form-region,
+  .file-preview-region {
+    will-change: auto;
+  }
+
+  .companion-intent-preview,
+  .companion-file-preview,
+  .companion-state-handoff,
+  .task-phase-beam,
+  .task-phase-origin,
+  .task-completion-field {
+    display: none;
+  }
+
+  .answer-reveal-piece {
+    opacity: 1 !important;
+    transform: none !important;
+    will-change: auto;
+  }
+
+  .motion-light-field {
+    display: none;
+  }
+}
+
+@media (pointer: coarse) {
+  .motion-light-field {
+    display: none;
+  }
+}

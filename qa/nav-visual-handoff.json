@@ -1,0 +1,7 @@
+{
+  "forwardStatusTaskOverlapMs": 0,
+  "reverseStatusTaskOverlapMs": 0,
+  "reverseLightVisibleMs": 265,
+  "reverseLightFinalOpacity": 0,
+  "statusOpacityReversals": 0
+}

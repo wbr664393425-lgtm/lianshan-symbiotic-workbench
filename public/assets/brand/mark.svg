@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 116" role="img" aria-labelledby="title">
+  <title id="title">连山山盾标识</title>
+  <!-- 品牌色板:
+       深海军蓝 #082B4C · 电蓝 #169BE6
+       克制红(浅色主题) #E84545 · 克制红(深色主题) #F05A5A
+       高光白 #F7FAFD -->
+  <path fill="#082B4C" d="M48 4 90 19v42c0 22-15 39-42 53C21 100 6 83 6 61V19L48 4Z"/>
+  <path fill="#169BE6" d="M6 19 42 8v35L30 32 9 64 6 61V19Z"/>
+  <path fill="#169BE6" d="M90 19 54 8v35l12-11 21 32 3-3V19Z"/>
+  <path fill="#E84545" d="M48 3c7 7 14 11 22 14v30L48 90 26 47V17c8-3 15-7 22-14Z"/>
+  <path fill="#F7FAFD" d="m30 32 18 26 18-26v14L48 92 30 46V32Z"/>
+</svg>

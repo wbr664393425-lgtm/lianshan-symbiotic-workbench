@@ -1,0 +1,15 @@
+{
+  "capturedAt": "2026-08-28T06:14:31.610Z",
+  "source": "gsap intro timeline seek, 20ms steps",
+  "context": "内容骨架与伴生体拆分为两条时间轴之后",
+  "figureCount": 1,
+  "introLayerCount": 1,
+  "imageReady": true,
+  "firstOpacity": 0,
+  "distinctOpacitySteps": 42,
+  "fullOpacityAtMs": 720,
+  "maxOpacityDelta": 0.0652,
+  "maxVerticalDelta": 0.78,
+  "finalOpacity": 1,
+  "timelineDurationMs": 1200
+}

@@ -1,0 +1,11 @@
+{
+  "figureCount": 1,
+  "introLayerCount": 1,
+  "imageReady": true,
+  "firstOpacity": 0.02,
+  "distinctOpacitySteps": 96,
+  "fullOpacityAtMs": 808,
+  "maxOpacityDelta": 0.028,
+  "maxVerticalDelta": 0.3,
+  "finalOpacity": 1
+}

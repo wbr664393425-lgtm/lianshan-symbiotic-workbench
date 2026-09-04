@@ -1,0 +1,39 @@
+{
+  "states": [
+    {
+      "figures": [
+        {
+          "className": "companion-figure companion-home-figure",
+          "opacity": 1,
+          "visibility": "visible"
+        },
+        {
+          "className": "companion-figure companion-transition-frame is-frame-1",
+          "opacity": 0,
+          "visibility": "hidden"
+        },
+        {
+          "className": "companion-figure companion-transition-frame is-frame-2",
+          "opacity": 0.9886,
+          "visibility": "visible"
+        },
+        {
+          "className": "companion-figure companion-transition-frame is-frame-3",
+          "opacity": 0.9821,
+          "visibility": "visible"
+        },
+        {
+          "className": "companion-figure companion-transition-frame is-frame-4",
+          "opacity": 0.9849,
+          "visibility": "visible"
+        },
+        {
+          "className": "companion-figure companion-task-figure",
+          "opacity": 0,
+          "visibility": "hidden"
+        }
+      ],
+      "name": "home-return-before"
+    }
+  ]
+}

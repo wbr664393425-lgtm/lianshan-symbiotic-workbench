@@ -1,0 +1,20 @@
+{
+  "active": "任务",
+  "composerExists": true,
+  "composerOpacity": 1,
+  "composerVisibility": "visible",
+  "inputOpacity": 1,
+  "toolbarOpacity": 1,
+  "rect": {
+    "x": 646,
+    "y": 994,
+    "width": 792,
+    "height": 122,
+    "bottom": 1116
+  },
+  "viewport": {
+    "width": 1958,
+    "height": 1242
+  },
+  "visibleArea": 96624
+}

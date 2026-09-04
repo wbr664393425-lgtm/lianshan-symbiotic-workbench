@@ -1,0 +1,101 @@
+{
+  "capturedAt": "2026-08-30T08:31:16.370Z",
+  "states": [
+    {
+      "name": "home-start",
+      "figures": [
+        {
+          "className": "companion-figure companion-shared-figure",
+          "opacity": 1,
+          "transform": "matrix(1, 0, 0, 1, 0, 0)",
+          "visibility": "visible"
+        }
+      ],
+      "active": "首页",
+      "homeOpacity": 1,
+      "taskOpacity": 0,
+      "navCenterDelta": 0,
+      "navSizeDelta": 0
+    },
+    {
+      "name": "tasks-settled",
+      "figures": [
+        {
+          "className": "companion-figure companion-shared-figure",
+          "opacity": 1,
+          "transform": "matrix(1, 0, 0, 1, 0, 0)",
+          "visibility": "visible"
+        }
+      ],
+      "active": "任务",
+      "homeOpacity": 0,
+      "taskOpacity": 1,
+      "navCenterDelta": 0,
+      "navSizeDelta": 0
+    },
+    {
+      "name": "files-settled",
+      "figures": [
+        {
+          "className": "companion-figure companion-shared-figure",
+          "opacity": 1,
+          "transform": "matrix(1, 0, 0, 1, 0, 0)",
+          "visibility": "visible"
+        }
+      ],
+      "active": "文件",
+      "homeOpacity": 0,
+      "taskOpacity": 1,
+      "navCenterDelta": 0,
+      "navSizeDelta": 0
+    },
+    {
+      "name": "settings-settled",
+      "figures": [
+        {
+          "className": "companion-figure companion-shared-figure",
+          "opacity": 1,
+          "transform": "matrix(1, 0, 0, 1, 0, 0)",
+          "visibility": "visible"
+        }
+      ],
+      "active": "设置",
+      "homeOpacity": 0,
+      "taskOpacity": 1,
+      "navCenterDelta": 0,
+      "navSizeDelta": 0
+    },
+    {
+      "name": "home-midway",
+      "figures": [
+        {
+          "className": "companion-figure companion-shared-figure",
+          "opacity": 1,
+          "transform": "matrix(1, 0, 0, 1, 0, 0)",
+          "visibility": "visible"
+        }
+      ],
+      "active": "首页",
+      "homeOpacity": 0.0115,
+      "taskOpacity": 1,
+      "navCenterDelta": 330.74,
+      "navSizeDelta": 0.04
+    },
+    {
+      "name": "home-settled",
+      "figures": [
+        {
+          "className": "companion-figure companion-shared-figure",
+          "opacity": 1,
+          "transform": "matrix(1, 0, 0, 1, 0, 0)",
+          "visibility": "visible"
+        }
+      ],
+      "active": "首页",
+      "homeOpacity": 1,
+      "taskOpacity": 0,
+      "navCenterDelta": 0,
+      "navSizeDelta": 0
+    }
+  ]
+}
